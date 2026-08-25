@@ -1,0 +1,2740 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  color: #f7f7f8;
+  background: #0b0b0d;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      #21140d 0,
+      #0b0b0d 30%,
+      #08080a 100%
+    );
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+/* =========================
+   HEADER
+========================= */
+
+.topbar {
+  height: 70px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 28px;
+
+  border-bottom: 1px solid #232329;
+
+  background: #0c0c0fdd;
+
+  backdrop-filter: blur(16px);
+
+  position: sticky;
+  top: 0;
+
+  z-index: 10;
+}
+
+.brand {
+  color: #ff8a42;
+
+  text-decoration: none;
+
+  font-weight: 900;
+
+  letter-spacing: -1px;
+
+  font-size: 22px;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 8px;
+}
+
+.topbar nav a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  color: #a9a9b2;
+
+  text-decoration: none;
+
+  padding: 10px 14px;
+
+  border-radius: 12px;
+}
+
+.topbar nav a.active {
+  background: #1c1c22;
+  color: white;
+}
+
+/* =========================
+   BOTONES
+========================= */
+
+button {
+  border: 1px solid #2b2b32;
+
+  background: #151519;
+
+  color: #d8d8df;
+
+  padding: 13px 16px;
+
+  border-radius: 16px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 8px;
+}
+
+button:hover {
+  border-color: #45454f;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* =========================
+   JUEGO
+========================= */
+
+.game-wrap {
+  max-width: 980px;
+
+  margin: auto;
+
+  padding: 42px 24px 80px;
+
+  text-align: center;
+
+  position: relative;
+}
+
+.score-pill {
+  position: absolute;
+
+  right: 24px;
+
+  top: 16px;
+
+  background: #17171b;
+
+  border: 1px solid #292930;
+
+  border-radius: 999px;
+
+  padding: 9px 14px;
+
+  display: flex;
+
+  gap: 8px;
+
+  align-items: center;
+
+  color: #ffbd75;
+
+  font-weight: 800;
+}
+
+/* =========================
+   FILTROS
+========================= */
+
+.filter-row,
+.difficulty-row {
+  display: grid;
+
+  gap: 14px;
+
+  margin: 18px 0;
+}
+
+.filter-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.difficulty-row {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.selected.blue {
+  background: #182438;
+
+  border-color: #69bfff;
+
+  box-shadow: 0 0 0 2px #69bfff55;
+}
+
+.difficulty-row .facil {
+  color: #55b86b;
+}
+
+.difficulty-row .media {
+  color: #d6b44e;
+}
+
+.difficulty-row .dificil {
+  color: #ff8a42;
+}
+
+.difficulty-row .experto {
+  color: #c6495f;
+}
+
+.difficulty-row .imposible {
+  color: #8a56d7;
+}
+
+.difficulty-row .selected {
+  background: #2a1a13;
+
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+/* =========================
+   BARRA DE PROGRESO
+========================= */
+
+.progress {
+  height: 12px;
+
+  border-radius: 999px;
+
+  background: #3b3b3f;
+
+  margin: 42px 0 75px;
+
+  overflow: hidden;
+}
+
+.progress span {
+  height: 100%;
+
+  display: block;
+
+  background: #ff8a42;
+
+  border-radius: 999px;
+
+  transition: width 0.25s;
+}
+
+/* =========================
+   PLAY
+========================= */
+
+.play-button {
+  width: 180px;
+
+  height: 180px;
+
+  border-radius: 50%;
+
+  margin: auto;
+
+  background: #ff8a42;
+
+  color: #141414;
+
+  border: none;
+
+  box-shadow: 0 0 50px #ff8a423b;
+}
+
+.play-button:hover {
+  background: #ff995b;
+
+  border: none;
+
+  transform: scale(1.03);
+}
+
+.seconds {
+  color: #ff9555;
+
+  font-size: 28px;
+
+  font-weight: 900;
+
+  margin: 20px 0 70px;
+}
+
+/* =========================
+   BUSCADOR
+========================= */
+
+.guess-area {
+  display: grid;
+
+  grid-template-columns: 1fr 210px;
+
+  gap: 16px;
+
+  align-items: start;
+}
+
+.autocomplete {
+  position: relative;
+}
+
+.autocomplete input {
+  width: 100%;
+
+  height: 68px;
+
+  border-radius: 24px;
+
+  border: 1px solid #36363e;
+
+  background: #16161a;
+
+  color: white;
+
+  padding: 0 24px;
+
+  font-size: 22px;
+
+  outline: none;
+}
+
+.autocomplete input::placeholder {
+  color: #73737d;
+}
+
+.autocomplete input:focus {
+  border-color: #ff8a42;
+
+  box-shadow: 0 0 0 3px #ff8a4220;
+}
+
+.guess-btn,
+.primary,
+.next-btn {
+  background: #ff8a42;
+
+  color: #111;
+
+  border: none;
+}
+
+.guess-btn:hover,
+.primary:hover,
+.next-btn:hover {
+  background: #ff995b;
+  border: none;
+}
+
+.guess-btn {
+  height: 68px;
+
+  font-size: 20px;
+}
+
+/* =========================
+   AUTOCOMPLETADO
+========================= */
+
+.suggestions {
+  position: absolute;
+
+  left: 0;
+
+  right: 0;
+
+  top: 75px;
+
+  background: #151519;
+
+  border: 1px solid #34343c;
+
+  border-radius: 16px;
+
+  overflow: hidden;
+
+  z-index: 5;
+
+  text-align: left;
+
+  box-shadow: 0 20px 40px #00000055;
+}
+
+.suggestions button {
+  display: flex;
+
+  width: 100%;
+
+  justify-content: space-between;
+
+  border: 0;
+
+  border-radius: 0;
+
+  border-bottom: 1px solid #28282e;
+
+  background: transparent;
+}
+
+.suggestions button:hover {
+  background: #1d1d22;
+}
+
+.suggestions span {
+  color: #8e8e98;
+
+  font-weight: 500;
+}
+
+/* =========================
+   ACCIONES
+========================= */
+
+.actions {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 18px;
+
+  margin-top: 20px;
+}
+
+/* =========================
+   MENSAJES
+========================= */
+
+.message {
+  margin: 22px auto 0;
+
+  padding: 14px 18px;
+
+  border-radius: 14px;
+
+  background: #17171b;
+
+  border: 1px solid #2d2d33;
+
+  max-width: 680px;
+}
+
+.message.won {
+  border-color: #4fa267;
+
+  color: #80d497;
+}
+
+.message.lost {
+  border-color: #b04c5a;
+
+  color: #ed8a97;
+}
+
+.notice {
+  padding: 16px 18px;
+
+  background: #18181d;
+
+  border: 1px solid #34343d;
+
+  border-radius: 14px;
+
+  margin: 18px 0;
+}
+
+.next-btn {
+  margin-top: 18px;
+}
+
+/* =========================
+   REVELAR CANCIÓN
+========================= */
+
+.song-reveal {
+  max-width: 620px;
+
+  margin: 24px auto 0;
+
+  padding: 18px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 20px;
+
+  text-align: left;
+
+  background: #111115;
+
+  border: 1px solid #292930;
+
+  border-radius: 22px;
+}
+
+.song-reveal img {
+  width: 110px;
+
+  height: 110px;
+
+  object-fit: cover;
+
+  border-radius: 16px;
+
+  flex-shrink: 0;
+}
+
+.song-reveal span {
+  color: #8e8e98;
+
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+.song-reveal h2 {
+  margin: 5px 0 3px;
+
+  font-size: 26px;
+}
+
+.song-reveal p {
+  margin: 0;
+
+  color: #aaaab3;
+
+  font-size: 17px;
+}
+
+/* =========================
+   ADMIN
+========================= */
+
+.admin-wrap {
+  max-width: 1180px;
+
+  margin: 0 auto;
+
+  padding: 42px 24px 80px;
+}
+
+.admin-wrap.narrow {
+  max-width: 560px;
+}
+
+.admin-head {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+  align-items: center;
+
+  margin-bottom: 24px;
+}
+
+h1 {
+  font-size: 36px;
+
+  margin: 0 0 8px;
+}
+
+h2 {
+  display: flex;
+
+  gap: 10px;
+
+  align-items: center;
+
+  margin: 0 0 20px;
+}
+
+.muted {
+  color: #8e8e98;
+}
+
+.admin-grid {
+  display: grid;
+
+  grid-template-columns: minmax(320px, 500px) 1fr;
+
+  gap: 24px;
+}
+
+/* =========================
+   CARDS
+========================= */
+
+.card {
+  background: #111115;
+
+  border: 1px solid #292930;
+
+  border-radius: 22px;
+
+  padding: 24px;
+}
+
+/* =========================
+   FORMULARIO
+========================= */
+
+.form-grid {
+  display: grid;
+
+  gap: 16px;
+}
+
+.form-grid label {
+  display: grid;
+
+  gap: 8px;
+
+  font-weight: 700;
+
+  color: #bebec7;
+
+  text-align: left;
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+
+  background: #19191e;
+
+  color: white;
+
+  border: 1px solid #34343d;
+
+  border-radius: 12px;
+
+  padding: 13px 14px;
+
+  outline: none;
+}
+
+.form-grid input:focus,
+.form-grid select:focus {
+  border-color: #ff8a42;
+}
+
+.two-cols {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 12px;
+}
+
+.primary {
+  padding: 14px 18px;
+}
+
+/* =========================
+   LISTADO DE CANCIONES
+========================= */
+
+.song-list {
+  align-self: start;
+}
+
+.song-row {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 14px;
+
+  align-items: center;
+
+  padding: 14px 0;
+
+  border-bottom: 1px solid #25252b;
+
+  text-align: left;
+}
+
+.song-row span {
+  display: block;
+
+  color: #858590;
+
+  font-size: 13px;
+
+  margin-top: 4px;
+}
+
+.song-info {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+.song-thumb {
+  width: 52px;
+
+  height: 52px;
+
+  object-fit: cover;
+
+  border-radius: 10px;
+
+  flex-shrink: 0;
+}
+
+.icon {
+  padding: 9px;
+}
+
+.danger {
+  color: #e87883;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 760px) {
+
+  .topbar {
+    padding: 0 14px;
+  }
+
+  .topbar nav a {
+    font-size: 0;
+  }
+
+  .topbar nav a svg {
+    width: 22px;
+
+    height: 22px;
+  }
+
+  .game-wrap {
+    padding: 34px 16px 70px;
+  }
+
+  .score-pill {
+    position: static;
+
+    width: max-content;
+
+    margin: 0 0 20px auto;
+  }
+
+  .filter-row {
+    gap: 8px;
+  }
+
+  .filter-row button {
+    padding: 11px 8px;
+
+    font-size: 14px;
+  }
+
+  .difficulty-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .progress {
+    margin: 30px 0 50px;
+  }
+
+  .play-button {
+    width: 150px;
+
+    height: 150px;
+  }
+
+  .seconds {
+    margin-bottom: 48px;
+  }
+
+  .guess-area {
+    grid-template-columns: 1fr;
+  }
+
+  .guess-btn {
+    height: 58px;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .two-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-head {
+    align-items: flex-start;
+  }
+
+  .admin-head h1 {
+    font-size: 30px;
+  }
+
+  .song-reveal {
+    text-align: center;
+
+    flex-direction: column;
+  }
+
+  .song-reveal img {
+    width: 150px;
+
+    height: 150px;
+  }
+}
+/* =================================
+   SPOTIFY - ADMIN DALE PLAY
+================================= */
+
+.spotify-card {
+  margin-bottom: 24px;
+}
+
+.spotify-title h2 {
+  margin-bottom: 6px;
+}
+
+.spotify-title p {
+  margin-top: 0;
+}
+
+.spotify-search {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.spotify-search input {
+  width: 100%;
+  min-width: 0;
+
+  background: #19191e;
+  color: #fff;
+
+  border: 1px solid #34343d;
+  border-radius: 14px;
+
+  padding: 14px 16px;
+
+  outline: none;
+}
+
+.spotify-search input:focus {
+  border-color: #1ed760;
+  box-shadow: 0 0 0 3px rgba(30, 215, 96, 0.12);
+}
+
+.spotify-search-btn {
+  background: #1ed760;
+  color: #08150c;
+
+  border: none;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.spotify-search-btn:hover {
+  background: #2ee86f;
+  border: none;
+}
+
+.spotify-error {
+  margin-top: 14px;
+
+  padding: 12px 14px;
+
+  border-radius: 12px;
+
+  color: #ef9aa4;
+  background: #281519;
+  border: 1px solid #5e2931;
+
+  font-size: 14px;
+}
+
+.spotify-results {
+  display: grid;
+  gap: 8px;
+
+  margin-top: 16px;
+
+  max-height: 430px;
+  overflow-y: auto;
+}
+
+.spotify-result {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  align-items: center;
+  gap: 13px;
+
+  padding: 10px;
+
+  text-align: left;
+
+  background: #17171b;
+  border: 1px solid #292930;
+  border-radius: 14px;
+}
+
+.spotify-result:hover {
+  background: #1e1e23;
+  border-color: #1ed760;
+}
+
+.spotify-result img,
+.spotify-cover-placeholder {
+  width: 58px;
+  height: 58px;
+
+  border-radius: 9px;
+
+  object-fit: cover;
+}
+
+.spotify-cover-placeholder {
+  display: grid;
+  place-items: center;
+
+  background: #28282f;
+  color: #777780;
+}
+
+.spotify-result-info {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.spotify-result-info strong {
+  color: #fff;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-result-info span {
+  color: #b1b1ba;
+
+  font-size: 14px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-result-info small {
+  color: #73737d;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-select-icon {
+  color: #1ed760;
+
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.spotify-result:hover .spotify-select-icon {
+  opacity: 1;
+}
+
+
+/* =================================
+   CANCIÓN SELECCIONADA
+================================= */
+
+.song-form {
+  margin-bottom: 24px;
+}
+
+.selected-track-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  padding: 13px;
+
+  background: #151519;
+
+  border: 1px solid #33333a;
+  border-radius: 16px;
+}
+
+.selected-track-preview img {
+  width: 82px;
+  height: 82px;
+
+  flex-shrink: 0;
+
+  object-fit: cover;
+
+  border-radius: 12px;
+}
+
+.selected-track-preview div {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.selected-track-preview span {
+  color: #1ed760;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.selected-track-preview strong {
+  margin-top: 3px;
+
+  color: #fff;
+
+  font-size: 18px;
+}
+
+.selected-track-preview p {
+  margin: 2px 0;
+
+  color: #b5b5be;
+}
+
+.selected-track-preview small {
+  color: #777781;
+}
+
+
+/* =================================
+   CAMPOS
+================================= */
+
+.field-help {
+  color: #74747e;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.optional {
+  margin-left: 6px;
+
+  color: #75757e;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.spotify-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 12px 14px;
+
+  color: #1ed760;
+  background: #132118;
+
+  border: 1px solid #234b31;
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 800;
+
+  text-decoration: none;
+}
+
+.spotify-link:hover {
+  background: #172b1e;
+}
+
+
+/* =================================
+   LISTADO
+================================= */
+
+.song-thumb-placeholder {
+  display: grid;
+  place-items: center;
+
+  background: #25252b;
+  color: #777781;
+}
+
+
+/* =================================
+   RESPONSIVE
+================================= */
+
+@media (max-width: 650px) {
+
+  .spotify-search {
+    grid-template-columns: 1fr;
+  }
+
+  .spotify-result {
+    grid-template-columns: 52px 1fr;
+  }
+
+  .spotify-result img,
+  .spotify-cover-placeholder {
+    width: 52px;
+    height: 52px;
+  }
+
+  .spotify-select-icon {
+    display: none;
+  }
+
+  .selected-track-preview {
+    align-items: flex-start;
+  }
+
+  .selected-track-preview img {
+    width: 72px;
+    height: 72px;
+  }
+}
+/* ======================================
+   NIVELES DALE PLAY
+====================================== */
+
+.difficulty-row {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.level-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 2px;
+
+  min-height: 58px;
+
+  border-radius: 15px;
+  border: 1px solid #292930;
+
+  background: #141418;
+
+  font-weight: 900;
+
+  opacity: .55;
+
+  transition: .2s;
+}
+
+.level-pill small {
+  font-size: 11px;
+  opacity: .7;
+}
+
+.level-pill.current {
+  opacity: 1;
+
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 0 2px currentColor;
+}
+
+.level-pill.used {
+  opacity: .25;
+}
+
+.level-pill.imposible {
+  color: #a967ff;
+}
+
+.level-pill.experto {
+  color: #ff5d74;
+}
+
+.level-pill.dificil {
+  color: #ff8a42;
+}
+
+.level-pill.media {
+  color: #e7c43b;
+}
+
+.level-pill.facil {
+  color: #37db79;
+}
+
+
+/* ======================================
+   BUSCADOR SPOTIFY DEL JUEGO
+====================================== */
+
+.spotify-game-search {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  height: 68px;
+
+  padding: 0 20px;
+
+  border: 1px solid #36363e;
+  border-radius: 24px;
+
+  background: #16161a;
+}
+
+.spotify-game-search svg {
+  color: #74747d;
+  flex-shrink: 0;
+}
+
+.spotify-game-search input {
+  height: auto !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: transparent !important;
+
+  box-shadow: none !important;
+}
+
+.spotify-searching {
+  margin-top: 8px;
+
+  color: #777781;
+
+  font-size: 12px;
+  text-align: left;
+}
+
+.spotify-game-results button {
+  justify-content: flex-start;
+
+  gap: 12px;
+}
+
+.spotify-game-results img {
+  width: 44px;
+  height: 44px;
+
+  object-fit: cover;
+
+  border-radius: 7px;
+
+  flex-shrink: 0;
+}
+
+.guess-track-info {
+  display: flex !important;
+  flex-direction: column;
+
+  align-items: flex-start;
+
+  min-width: 0;
+}
+
+.guess-track-info b {
+  color: #fff;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  max-width: 100%;
+}
+
+.guess-track-info small {
+  color: #888891;
+}
+
+
+/* ======================================
+   HISTORIAL DE INTENTOS
+====================================== */
+
+.attempt-history {
+  max-width: 680px;
+
+  margin: 26px auto 0;
+
+  padding: 18px;
+
+  border: 1px solid #292930;
+  border-radius: 20px;
+
+  background: #111115;
+
+  text-align: left;
+}
+
+.attempt-history h3 {
+  margin: 0 0 14px;
+}
+
+.attempt-row {
+  display: grid;
+
+  grid-template-columns: 34px 110px 1fr;
+
+  gap: 12px;
+
+  align-items: center;
+
+  padding: 10px 0;
+
+  border-bottom:
+    1px solid #25252b;
+}
+
+.attempt-row:last-child {
+  border-bottom: 0;
+}
+
+.attempt-number {
+  width: 28px;
+  height: 28px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: #232329;
+
+  font-size: 12px;
+
+  font-weight: 900;
+}
+
+.attempt-row > span:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+}
+
+.attempt-row small {
+  color: #75757f;
+
+  font-size: 11px;
+}
+
+.attempt-answer {
+  color: #a5a5ad;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attempt-row.correct {
+  color: #55d982;
+}
+
+.attempt-row.correct .attempt-number {
+  background: #173922;
+}
+
+
+/* ======================================
+   GUARDAR PUNTOS
+====================================== */
+
+.save-score-card {
+  max-width: 620px;
+
+  margin: 18px auto 0;
+
+  padding: 18px;
+
+  background: #111115;
+
+  border: 1px solid #292930;
+  border-radius: 20px;
+}
+
+.save-score-card h3 {
+  margin: 0 0 14px;
+}
+
+.save-score-form {
+  display: grid;
+
+  grid-template-columns: 1fr auto;
+
+  gap: 10px;
+}
+
+.save-score-form input {
+  width: 100%;
+
+  padding: 13px 15px;
+
+  color: white;
+  background: #19191e;
+
+  border: 1px solid #34343d;
+  border-radius: 12px;
+
+  outline: none;
+}
+
+
+/* ======================================
+   LEADERBOARD
+====================================== */
+
+.leaderboard {
+  max-width: 620px;
+
+  margin: 24px auto 0;
+
+  padding: 18px;
+
+  border: 1px solid #292930;
+  border-radius: 20px;
+
+  background: #111115;
+
+  text-align: left;
+}
+
+.leaderboard h3 {
+  margin: 0 0 14px;
+}
+
+.leaderboard-row {
+  display: grid;
+
+  grid-template-columns: 45px 1fr auto;
+
+  gap: 12px;
+
+  padding: 10px 0;
+
+  border-bottom:
+    1px solid #25252b;
+}
+
+.leaderboard-row:last-child {
+  border-bottom: 0;
+}
+
+
+/* ======================================
+   MOBILE
+====================================== */
+
+@media(max-width:700px) {
+
+  .difficulty-row {
+    grid-template-columns:
+      repeat(5, minmax(72px, 1fr));
+
+    overflow-x: auto;
+
+    padding-bottom: 5px;
+  }
+
+  .level-pill {
+    min-width: 72px;
+  }
+
+  .attempt-row {
+    grid-template-columns:
+      32px 85px 1fr;
+  }
+
+  .save-score-form {
+    grid-template-columns: 1fr;
+  }
+}
+/* ===============================
+   SALAS PRIVADAS
+=============================== */
+
+.rooms-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 60px 24px 90px;
+}
+
+.rooms-hero {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.rooms-hero h1 {
+  margin: 7px 0 8px;
+  font-size: 42px;
+}
+
+.rooms-hero p {
+  margin: 0;
+  color: #8e8e98;
+  font-size: 17px;
+}
+
+.room-eyebrow {
+  color: #ff8a42;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+}
+
+.rooms-card,
+.room-lobby-card {
+  background: #111115;
+  border: 1px solid #292930;
+  border-radius: 24px;
+  padding: 26px;
+}
+
+.rooms-card label {
+  display: grid;
+  gap: 8px;
+  font-weight: 800;
+  color: #bebec7;
+}
+
+.rooms-card input {
+  width: 100%;
+  padding: 15px 16px;
+  background: #19191e;
+  color: #fff;
+  border: 1px solid #34343d;
+  border-radius: 14px;
+  outline: none;
+}
+
+.rooms-card input:focus {
+  border-color: #ff8a42;
+}
+
+.room-main-btn,
+.room-secondary-btn {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.room-secondary-btn {
+  background: #17171b;
+}
+
+.room-divider {
+  position: relative;
+  text-align: center;
+  margin: 25px 0;
+  color: #6f6f78;
+}
+
+.room-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: #292930;
+}
+
+.room-divider span {
+  position: relative;
+  background: #111115;
+  padding: 0 12px;
+}
+
+.room-lobby-card {
+  text-align: center;
+}
+
+.room-lobby-card h1 {
+  margin: 8px 0 18px;
+}
+
+.room-code {
+  margin: 0 auto;
+  min-width: 220px;
+  background: #ff8a42;
+  color: #111;
+  border: none;
+  font-size: 32px;
+  letter-spacing: 7px;
+  font-weight: 950;
+}
+
+.room-player-header {
+  margin-top: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.room-player-header h2 {
+  margin: 0;
+}
+
+.room-player-header > span {
+  color: #8e8e98;
+  font-weight: 800;
+}
+
+.room-player-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.room-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #17171b;
+  border: 1px solid #292930;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.room-player-avatar {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #2a1a13;
+  color: #ff8a42;
+  font-weight: 900;
+}
+
+.room-player strong {
+  flex: 1;
+}
+
+.host-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ffbd75;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.room-waiting {
+  margin-top: 22px;
+  padding: 13px;
+  border-radius: 12px;
+  background: #17171b;
+  color: #8e8e98;
+  font-size: 14px;
+}
+
+@media(max-width:650px) {
+
+  .rooms-wrap {
+    padding: 40px 16px 70px;
+  }
+
+  .rooms-hero h1 {
+    font-size: 34px;
+  }
+
+  .room-code {
+    min-width: 100%;
+    font-size: 28px;
+  }
+}
+
+.room-start-area {
+  margin-top: 22px;
+
+  display: grid;
+
+  gap: 10px;
+}
+
+.room-start-btn {
+  width: 100%;
+}
+
+.room-start-area small {
+  color: #7d7d87;
+  font-size: 12px;
+}
+.room-ready {
+  color: #55d982 !important;
+}
+/* =========================================
+   PARTIDA MULTIJUGADOR
+========================================= */
+
+.room-game-wrap {
+  width: min(920px, calc(100% - 32px));
+
+  margin: 0 auto;
+
+  padding: 38px 0 80px;
+
+  text-align: center;
+}
+
+
+.room-game-top {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 25px;
+
+  text-align: left;
+}
+
+
+.room-game-top h2 {
+  margin: 5px 0 0;
+}
+
+
+.room-score-mini {
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+
+  padding: 10px 15px;
+
+  border-radius: 999px;
+
+  background: #17171b;
+
+  border: 1px solid #292930;
+
+  color: #ffbd75;
+
+  font-weight: 900;
+}
+
+
+/* =========================================
+   RESULTADO DE RONDA
+========================================= */
+
+.round-result-card {
+  max-width: 520px;
+
+  margin: 10px auto 30px;
+
+  padding: 26px;
+
+  background: #111115;
+
+  border: 1px solid #292930;
+
+  border-radius: 24px;
+}
+
+
+.round-result-card img {
+  width: 155px;
+
+  height: 155px;
+
+  object-fit: cover;
+
+  border-radius: 18px;
+
+  margin-bottom: 15px;
+}
+
+
+.round-result-card > span {
+  display: block;
+
+  color: #ff8a42;
+
+  font-size: 13px;
+
+  font-weight: 900;
+
+  text-transform: uppercase;
+
+  letter-spacing: .8px;
+}
+
+
+.round-result-card h2 {
+  display: block;
+
+  margin: 5px 0;
+
+  font-size: 30px;
+}
+
+
+.round-result-card p {
+  margin: 0 0 12px;
+
+  color: #9999a3;
+
+  font-size: 17px;
+}
+
+
+.round-earned {
+  display: block;
+
+  margin: 15px 0;
+
+  color: #55d982;
+
+  font-size: 28px;
+}
+
+
+.round-waiting {
+  margin: 16px 0;
+
+  padding: 11px;
+
+  background: #18181d;
+
+  border-radius: 12px;
+
+  color: #9999a3;
+
+  font-size: 13px;
+}
+
+
+/* =========================================
+   MARCADOR EN VIVO
+========================================= */
+
+.live-scoreboard {
+  max-width: 620px;
+
+  margin: 32px auto 0;
+
+  padding: 20px;
+
+  text-align: left;
+
+  background: #111115;
+
+  border: 1px solid #292930;
+
+  border-radius: 22px;
+}
+
+
+.live-scoreboard h3 {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  margin: 0 0 12px;
+}
+
+
+.live-score-row {
+  display: grid;
+
+  grid-template-columns: 45px 1fr auto;
+
+  gap: 12px;
+
+  align-items: center;
+
+  padding: 11px 4px;
+
+  border-bottom: 1px solid #25252b;
+}
+
+
+.live-score-row:last-child {
+  border-bottom: 0;
+}
+
+
+.live-score-row > span {
+  color: #777781;
+
+  font-size: 13px;
+
+  font-weight: 800;
+}
+
+
+.live-score-row > b {
+  color: #ffbd75;
+}
+
+
+/* =========================================
+   FINAL DE PARTIDA
+========================================= */
+
+.game-final-card {
+  max-width: 620px;
+
+  margin: 40px auto;
+
+  padding: 30px;
+
+  background: #111115;
+
+  border: 1px solid #292930;
+
+  border-radius: 26px;
+
+  text-align: center;
+}
+
+
+.game-final-card > svg {
+  color: #ffbd75;
+
+  margin-bottom: 14px;
+}
+
+
+.game-final-card h1 {
+  margin-top: 7px;
+}
+
+
+.multiplayer-ranking {
+  margin: 25px 0;
+}
+
+
+.multiplayer-rank-row {
+  display: grid;
+
+  grid-template-columns: 50px 1fr auto;
+
+  gap: 12px;
+
+  align-items: center;
+
+  text-align: left;
+
+  padding: 13px 6px;
+
+  border-bottom: 1px solid #292930;
+}
+
+
+.multiplayer-rank-row:first-child {
+  color: #ffbd75;
+
+  font-size: 18px;
+}
+
+
+.multiplayer-rank-row:last-child {
+  border-bottom: 0;
+}
+
+
+@media(max-width:650px) {
+
+  .room-game-wrap {
+    width: calc(100% - 24px);
+
+    padding-top: 25px;
+  }
+
+
+  .room-game-top {
+    align-items: flex-start;
+  }
+
+
+  .room-game-top h2 {
+    font-size: 19px;
+  }
+
+
+  .round-result-card img {
+    width: 135px;
+
+    height: 135px;
+  }
+}
+
+/* =====================================
+   BOTONES ADIVINAR + SALTAR
+===================================== */
+
+.guess-area {
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+}
+
+.guess-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.guess-btn,
+.skip-inline-btn {
+  height: 68px;
+  min-width: 130px;
+}
+
+.skip-inline-btn {
+  background: #17171b;
+  color: #d8d8df;
+
+  border: 1px solid #34343d;
+}
+
+.skip-inline-btn:hover {
+  background: #202026;
+  border-color: #565661;
+}
+
+.single-action {
+  margin-top: 14px;
+
+  display: flex;
+  justify-content: center;
+}
+
+.single-action button {
+  min-width: 160px;
+}
+
+
+@media(max-width:760px) {
+
+  .guess-area {
+    grid-template-columns: 1fr;
+  }
+
+  .guess-actions {
+    width: 100%;
+  }
+
+  .guess-btn,
+  .skip-inline-btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+/* =================================
+   ADMIN - AUDIO HÍBRIDO
+================================= */
+
+.admin-audio-yes,
+.admin-audio-no {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-audio-yes {
+  color: #55d982;
+}
+
+.admin-audio-no {
+  color: #ffad66;
+}
+
+.admin-audio-status {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border-radius: 14px;
+  border: 1px solid #303038;
+  background: #17171c;
+}
+
+.admin-audio-status svg {
+  flex-shrink: 0;
+}
+
+.admin-audio-status div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-audio-status strong {
+  font-size: 14px;
+}
+
+.admin-audio-status span {
+  color: #8d8d98;
+  font-size: 12px;
+}
+
+.admin-audio-status.available {
+  border-color: rgba(85, 217, 130, .35);
+}
+
+.admin-audio-status.available svg {
+  color: #55d982;
+}
+
+.admin-audio-status.missing {
+  border-color: rgba(255, 173, 102, .35);
+}
+
+.admin-audio-status.missing svg {
+  color: #ffad66;
+}
+
+.admin-preview-test {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #17171c;
+  border: 1px solid #303038;
+}
+
+.admin-preview-test span {
+  color: #9999a3;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-preview-test audio {
+  width: 100%;
+}
+.spotify-hidden-player {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0.01;
+  position: absolute;
+  pointer-events: none;
+}
+
+.spotify-hidden-player iframe {
+  width: 1px !important;
+  height: 1px !important;
+  border: 0;
+}
+/* =====================================
+   PLAY / CARGA SPOTIFY
+===================================== */
+
+.play-button {
+  transition:
+    transform .15s ease,
+    opacity .15s ease;
+}
+
+.play-button:active {
+  transform: scale(.96);
+}
+
+.play-button.audio-starting {
+  opacity: .82;
+}
+
+
+/* =====================================
+   SIGUIENTE CANCIÓN MÁS A LA MANO
+===================================== */
+
+.next-song-prominent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  width: min(100%, 420px);
+
+  margin: 18px auto 22px;
+
+  min-height: 54px;
+
+  font-size: 15px;
+  font-weight: 900;
+}
+
+
+/* Siguiente ronda multiplayer */
+
+.room-next-round-btn {
+  width: 100%;
+  min-height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.next-song-immediate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  width: min(100%, 420px);
+
+  margin: 14px auto 18px;
+
+  min-height: 54px;
+
+  font-size: 15px;
+  font-weight: 900;
+}
+/* =========================================
+   CARGA MASIVA
+========================================= */
+
+.bulk-import-card {
+  margin-bottom: 25px;
+}
+
+.bulk-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.bulk-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 5px;
+}
+
+.bulk-starter-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.bulk-textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+
+  padding: 16px;
+
+  background: #111115;
+  color: #f5f5f7;
+
+  border: 1px solid #303038;
+  border-radius: 16px;
+
+  font: inherit;
+  line-height: 1.65;
+}
+
+.bulk-textarea:focus {
+  outline: none;
+  border-color: #ff8540;
+}
+
+.bulk-search-btn {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.bulk-progress {
+  margin-top: 14px;
+  padding: 11px 14px;
+
+  background: #17171c;
+  border-radius: 12px;
+
+  color: #9999a5;
+  font-size: 13px;
+}
+
+.bulk-results {
+  margin-top: 20px;
+}
+
+.bulk-results-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+
+  padding-bottom: 12px;
+
+  color: #aaaab4;
+  font-size: 13px;
+}
+
+.bulk-result-row {
+  display: grid;
+
+  grid-template-columns:
+    34px
+    55px
+    minmax(0, 1fr)
+    34px;
+
+  gap: 12px;
+
+  align-items: center;
+
+  padding: 11px;
+
+  margin-bottom: 8px;
+
+  border: 1px solid #292930;
+  border-radius: 14px;
+
+  background: #111115;
+}
+
+.bulk-result-row.selected {
+  border-color:
+    rgba(85, 217, 130, .55);
+}
+
+.bulk-result-row > img,
+.bulk-no-cover {
+  width: 55px;
+  height: 55px;
+
+  border-radius: 9px;
+
+  object-fit: cover;
+}
+
+.bulk-no-cover {
+  display: grid;
+  place-items: center;
+
+  background: #1b1b20;
+
+  color: #777780;
+}
+
+.bulk-check {
+  width: 28px;
+  height: 28px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border-radius: 8px;
+
+  border: 1px solid #3a3a42;
+
+  background: #18181d;
+}
+
+.bulk-result-row.selected
+.bulk-check {
+  background: #55d982;
+  color: #0d1510;
+
+  border-color: #55d982;
+}
+
+.bulk-result-info {
+  min-width: 0;
+
+  display: grid;
+  gap: 3px;
+}
+
+.bulk-result-info small {
+  overflow: hidden;
+
+  color: #73737e;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-result-info strong {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-result-info span {
+  overflow: hidden;
+
+  color: #aaaab4;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-result-info em {
+  color: #55d982;
+
+  font-size: 11px;
+  font-style: normal;
+}
+
+.bulk-not-found {
+  color: #ff786e;
+}
+
+.bulk-remove {
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  color: #777781;
+
+  background: transparent;
+
+  border: 0;
+}
+
+.bulk-import-btn {
+  margin-top: 16px;
+
+  width: 100%;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+
+  min-height: 52px;
+}
+
+
+@media(max-width:700px) {
+
+  .bulk-header {
+    flex-direction: column;
+  }
+
+  .bulk-starter-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .bulk-result-row {
+    grid-template-columns:
+      30px
+      48px
+      minmax(0, 1fr)
+      28px;
+  }
+
+  .bulk-result-row > img,
+  .bulk-no-cover {
+    width: 48px;
+    height: 48px;
+  }
+}
+/* =========================================
+   SALA PRIVADA - MODO COMPETITIVO
+========================================= */
+
+.room-round-timer {
+  width: fit-content;
+
+  margin: 18px auto 22px;
+
+  padding: 10px 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  border-radius: 999px;
+
+  background: #17171c;
+  border: 1px solid #303038;
+
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-round-timer.danger {
+  transform: scale(1.04);
+}
+
+.room-preparing-card {
+  max-width: 460px;
+
+  margin: 30px auto;
+
+  padding: 28px;
+
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+
+  text-align: center;
+
+  border: 1px solid #2b2b32;
+  border-radius: 20px;
+
+  background: #151519;
+}
+
+.room-preparing-card strong {
+  font-size: 18px;
+}
+
+.room-preparing-card span {
+  color: #92929c;
+  font-size: 13px;
+}
+
+.room-spin {
+  animation: roomSpin .8s linear infinite;
+}
+
+@keyframes roomSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* =========================================
+   NIVEL
+========================================= */
+
+.room-level-card {
+  width: fit-content;
+
+  margin: 15px auto;
+
+  display: grid;
+  justify-items: center;
+
+  gap: 2px;
+}
+
+.room-level-card > span {
+  color: #777782;
+
+  font-size: 10px;
+  font-weight: 900;
+
+  letter-spacing: .15em;
+}
+
+.room-level-card > strong {
+  font-size: 23px;
+}
+
+.room-level-card > small {
+  color: #9999a3;
+}
+
+
+/* =========================================
+   PUNTOS POTENCIALES
+========================================= */
+
+.room-potential-score {
+  margin: 18px auto 14px;
+
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  gap: 6px;
+}
+
+.room-potential-score strong {
+  font-size: 25px;
+}
+
+.room-potential-score span {
+  color: #8d8d98;
+  font-size: 13px;
+}
+
+.room-potential-score em {
+  width: 100%;
+
+  text-align: center;
+
+  color: #ff8078;
+
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+
+/* =========================================
+   RESULTADO / POSICIÓN
+========================================= */
+
+.room-finish-position {
+  margin-top: 10px;
+
+  padding: 9px 13px;
+
+  border-radius: 10px;
+
+  background: #18181d;
+
+  color: #aaaab4;
+
+  font-size: 13px;
+}
+
+.room-finish-position strong {
+  color: #fff;
+}
+
+
+/* =========================================
+   ACERTARON ESTA RONDA
+========================================= */
+
+.room-correct-list {
+  max-width: 620px;
+
+  margin: 28px auto 18px;
+
+  padding: 18px;
+
+  border: 1px solid #292930;
+  border-radius: 18px;
+
+  background: #121216;
+}
+
+.room-correct-list h3 {
+  margin: 0 0 13px;
+
+  font-size: 15px;
+}
+
+.room-correct-row {
+  display: grid;
+
+  grid-template-columns:
+    36px
+    minmax(0, 1fr)
+    auto;
+
+  align-items: center;
+
+  gap: 8px;
+
+  min-height: 45px;
+
+  border-bottom:
+    1px solid #24242a;
+}
+
+.room-correct-row:last-child {
+  border-bottom: 0;
+}
+
+.room-correct-row b {
+  font-size: 13px;
+}
+
+
+/* =========================================
+   BOTÓN SIGUIENTE
+========================================= */
+
+.room-next-round-btn {
+  width: 100%;
+
+  min-height: 52px;
+
+  margin-top: 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
