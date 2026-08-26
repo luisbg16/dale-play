@@ -129,6 +129,14 @@ function sameSong(song, guess) {
   const guessArtist =
     normalizeArtist(guess.artist)
 
+    const hardStopAtRef =
+  useRef(null)
+
+const stopFrameRef =
+  useRef(null)
+
+const pauseHammerRef =
+  useRef(null)
 
   return (
     songTitle === guessTitle &&
@@ -1205,96 +1213,41 @@ export default function RoomGamePage() {
     )
 
 
-    controller.addListener(
-      'playback_started',
-      () => {
-
-        if (
-          !playingRequestRef.current
-        ) {
-          return
-        }
-
-
-        playbackStartedAtRef.current =
-          performance.now()
-
-
-        setAudioStarting(false)
-
-        setIsPlaying(true)
-
-
-        clearInterval(
-          playbackWatchdogRef.current
-        )
-
-        clearTimeout(
-          fallbackTimerRef.current
-        )
-
-
-        playbackWatchdogRef.current =
-          setInterval(
-            () => {
-
-              if (
-                !playingRequestRef.current ||
-                playbackStartedAtRef.current ===
-                  null ||
-                targetDurationRef.current ===
-                  null
-              ) {
-                return
-              }
-
-
-              const elapsed =
-                performance.now() -
-                playbackStartedAtRef.current
-
-
-              if (
-                elapsed >=
-                targetDurationRef.current
-              ) {
-
-                forceStopSpotify()
-              }
-
-            },
-            50
-          )
-
-
-        fallbackTimerRef.current =
-          setTimeout(
-            () => {
-
-              forceStopSpotify()
-
-            },
-            (
-              targetDurationRef.current ||
-              1000
-            ) + 350
-          )
-      }
-    )
-  }
-
-
-  function forceStopSpotify() {
+   controller.addListener(
+  'playback_started',
+  () => {
 
     if (
-      stoppingRef.current
+      !playingRequestRef.current
     ) {
       return
     }
 
 
-    stoppingRef.current =
-      true
+    /*
+    Spotify acaba de confirmar
+    que comenzó la reproducción.
+    */
+
+    const now =
+      performance.now()
+
+
+    playbackStartedAtRef.current =
+      now
+
+
+    hardStopAtRef.current =
+      now +
+      (
+        targetDurationRef.current ||
+        1000
+      )
+
+
+    setAudioStarting(false)
+
+    setIsPlaying(true)
 
 
     clearInterval(
@@ -1305,55 +1258,133 @@ export default function RoomGamePage() {
       fallbackTimerRef.current
     )
 
-
-    playbackStartedAtRef.current =
-      null
-
-    playingRequestRef.current =
-      false
-
-    targetDurationRef.current =
-      null
-
-
-    const controller =
-      controllerRef.current
-
-
-    controller?.pause()
-
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      80
+    cancelAnimationFrame(
+      stopFrameRef.current
     )
 
 
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      220
-    )
+    /*
+    ===================================
+    RELOJ DE ALTA PRECISIÓN
+    ===================================
+    */
+
+    const watchPlayback = () => {
+
+      if (
+        !playingRequestRef.current ||
+        hardStopAtRef.current === null
+      ) {
+        return
+      }
 
 
-    setAudioStarting(false)
+      if (
+        performance.now() >=
+        hardStopAtRef.current
+      ) {
 
-    setIsPlaying(false)
+        forceStopSpotify()
+
+        return
+      }
 
 
-    setTimeout(
-      () => {
+      stopFrameRef.current =
+        requestAnimationFrame(
+          watchPlayback
+        )
+    }
 
-        stoppingRef.current =
-          false
 
-      },
-      300
-    )
+    stopFrameRef.current =
+      requestAnimationFrame(
+        watchPlayback
+      )
+
+
+    /*
+    ===================================
+    SEGUNDO RELOJ DE RESPALDO
+    ===================================
+    */
+
+    fallbackTimerRef.current =
+      setTimeout(
+        () => {
+
+          forceStopSpotify()
+
+        },
+        (
+          targetDurationRef.current ||
+          1000
+        ) + 80
+      )
   }
+)
+  }
+
+
+function stopSpotify() {
+
+  clearInterval(
+    playbackWatchdogRef.current
+  )
+
+  clearTimeout(
+    fallbackTimerRef.current
+  )
+
+  cancelAnimationFrame(
+    stopFrameRef.current
+  )
+
+  clearInterval(
+    pauseHammerRef.current
+  )
+
+
+  hardStopAtRef.current =
+    null
+
+  playbackStartedAtRef.current =
+    null
+
+  playingRequestRef.current =
+    false
+
+  targetDurationRef.current =
+    null
+
+
+  const controller =
+    typeof getActiveController === 'function'
+      ? getActiveController()
+      : controllerRef.current
+
+
+  controller?.pause()
+
+
+  /*
+  Segunda orden rápida de seguridad.
+  */
+
+  setTimeout(
+    () => {
+
+      controller?.pause()
+
+    },
+    100
+  )
+
+
+  setAudioStarting(false)
+
+  setIsPlaying(false)
+}
 
 
   function stopSpotify() {

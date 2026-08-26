@@ -111,6 +111,14 @@ function sameSong(song, guess) {
   const guessArtist =
     normalizeArtist(guess.artist)
 
+  const hardStopAtRef =
+  useRef(null)
+
+const stopFrameRef =
+  useRef(null)
+
+const pauseHammerRef =
+  useRef(null)    
 
   return (
     songTitle === guessTitle &&
@@ -766,90 +774,116 @@ export default function GamePage() {
     )
 
 
-    controller.addListener(
-      'playback_started',
-      () => {
+   controller.addListener(
+  'playback_started',
+  () => {
 
-        if (
-          slot !==
-          activeSlotRef.current
-        ) {
-          return
-        }
-
-
-        if (
-          !playingRequestRef.current
-        ) {
-          return
-        }
+    if (
+      !playingRequestRef.current
+    ) {
+      return
+    }
 
 
-        playbackStartedAtRef.current =
-          performance.now()
+    /*
+    Spotify acaba de confirmar
+    que comenzó la reproducción.
+    */
+
+    const now =
+      performance.now()
 
 
-        setAudioStarting(false)
-
-        setIsPlaying(true)
-
-
-        clearInterval(
-          playbackWatchdogRef.current
-        )
-
-        clearTimeout(
-          fallbackTimerRef.current
-        )
+    playbackStartedAtRef.current =
+      now
 
 
-        playbackWatchdogRef.current =
-          setInterval(
-            () => {
-
-              if (
-                !playingRequestRef.current ||
-                playbackStartedAtRef.current ===
-                  null ||
-                targetDurationRef.current ===
-                  null
-              ) {
-                return
-              }
+    hardStopAtRef.current =
+      now +
+      (
+        targetDurationRef.current ||
+        1000
+      )
 
 
-              const elapsed =
-                performance.now() -
-                playbackStartedAtRef.current
+    setAudioStarting(false)
+
+    setIsPlaying(true)
 
 
-              if (
-                elapsed >=
-                targetDurationRef.current
-              ) {
-
-                forceStopSpotify()
-              }
-
-            },
-            50
-          )
-
-
-        fallbackTimerRef.current =
-          setTimeout(
-            () => {
-
-              forceStopSpotify()
-
-            },
-            (
-              targetDurationRef.current ||
-              1000
-            ) + 350
-          )
-      }
+    clearInterval(
+      playbackWatchdogRef.current
     )
+
+    clearTimeout(
+      fallbackTimerRef.current
+    )
+
+    cancelAnimationFrame(
+      stopFrameRef.current
+    )
+
+
+    /*
+    ===================================
+    RELOJ DE ALTA PRECISIÓN
+    ===================================
+    */
+
+    const watchPlayback = () => {
+
+      if (
+        !playingRequestRef.current ||
+        hardStopAtRef.current === null
+      ) {
+        return
+      }
+
+
+      if (
+        performance.now() >=
+        hardStopAtRef.current
+      ) {
+
+        forceStopSpotify()
+
+        return
+      }
+
+
+      stopFrameRef.current =
+        requestAnimationFrame(
+          watchPlayback
+        )
+    }
+
+
+    stopFrameRef.current =
+      requestAnimationFrame(
+        watchPlayback
+      )
+
+
+    /*
+    ===================================
+    SEGUNDO RELOJ DE RESPALDO
+    ===================================
+    */
+
+    fallbackTimerRef.current =
+      setTimeout(
+        () => {
+
+          forceStopSpotify()
+
+        },
+        (
+          targetDurationRef.current ||
+          1000
+        ) + 80
+      )
+  }
+)
   }
 
 
@@ -923,113 +957,180 @@ export default function GamePage() {
   =====================================
   */
 
-  function forceStopSpotify() {
+function forceStopSpotify() {
 
-    if (
-      stoppingRef.current
-    ) {
-      return
-    }
+  /*
+  Ya estamos cortando.
+  No iniciar otro proceso.
+  */
 
-
-    stoppingRef.current =
-      true
-
-
-    clearInterval(
-      playbackWatchdogRef.current
-    )
-
-    clearTimeout(
-      fallbackTimerRef.current
-    )
-
-
-    playbackStartedAtRef.current =
-      null
-
-    playingRequestRef.current =
-      false
-
-    targetDurationRef.current =
-      null
-
-
-    const controller =
-      getActiveController()
-
-
-    controller?.pause()
-
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      80
-    )
-
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      220
-    )
-
-
-    setAudioStarting(false)
-
-    setIsPlaying(false)
-
-
-    setTimeout(
-      () => {
-
-        stoppingRef.current =
-          false
-
-      },
-      300
-    )
+  if (stoppingRef.current) {
+    return
   }
 
 
-  function stopSpotify() {
+  stoppingRef.current =
+    true
 
-    clearInterval(
-      playbackWatchdogRef.current
+
+  clearInterval(
+    playbackWatchdogRef.current
+  )
+
+  clearTimeout(
+    fallbackTimerRef.current
+  )
+
+  cancelAnimationFrame(
+    stopFrameRef.current
+  )
+
+  clearInterval(
+    pauseHammerRef.current
+  )
+
+
+  hardStopAtRef.current =
+    null
+
+  playbackStartedAtRef.current =
+    null
+
+  playingRequestRef.current =
+    false
+
+  targetDurationRef.current =
+    null
+
+
+  const controller =
+    typeof getActiveController === 'function'
+      ? getActiveController()
+      : controllerRef.current
+
+
+  /*
+  PRIMER PAUSE
+  */
+
+  controller?.pause()
+
+
+  /*
+  SPOTIFY a veces tarda en obedecer.
+  Durante un segundo seguimos
+  enviando PAUSE.
+  */
+
+  let attempts = 0
+
+
+  pauseHammerRef.current =
+    setInterval(
+      () => {
+
+        controller?.pause()
+
+        attempts += 1
+
+
+        if (attempts >= 10) {
+
+          clearInterval(
+            pauseHammerRef.current
+          )
+
+          pauseHammerRef.current =
+            null
+        }
+
+      },
+      100
     )
 
-    clearTimeout(
-      fallbackTimerRef.current
-    )
+
+  setAudioStarting(false)
+
+  setIsPlaying(false)
 
 
-    playbackStartedAtRef.current =
-      null
+  /*
+  Dejamos desbloquear otro Play
+  después de que Spotify haya tenido
+  tiempo para detenerse.
+  */
 
-    playingRequestRef.current =
-      false
+  setTimeout(
+    () => {
 
-    targetDurationRef.current =
-      null
+      stoppingRef.current =
+        false
 
-    stoppingRef.current =
-      false
-
-
-    controllerARef.current
-      ?.pause()
-
-    controllerBRef.current
-      ?.pause()
+    },
+    1100
+  )
+}
 
 
-    setAudioStarting(false)
+function stopSpotify() {
 
-    setIsPlaying(false)
-  }
+  clearInterval(
+    playbackWatchdogRef.current
+  )
+
+  clearTimeout(
+    fallbackTimerRef.current
+  )
+
+  cancelAnimationFrame(
+    stopFrameRef.current
+  )
+
+  clearInterval(
+    pauseHammerRef.current
+  )
+
+
+  hardStopAtRef.current =
+    null
+
+  playbackStartedAtRef.current =
+    null
+
+  playingRequestRef.current =
+    false
+
+  targetDurationRef.current =
+    null
+
+
+  const controller =
+    typeof getActiveController === 'function'
+      ? getActiveController()
+      : controllerRef.current
+
+
+  controller?.pause()
+
+
+  /*
+  Segunda orden rápida de seguridad.
+  */
+
+  setTimeout(
+    () => {
+
+      controller?.pause()
+
+    },
+    100
+  )
+
+
+  setAudioStarting(false)
+
+  setIsPlaying(false)
+}
 
 
   function togglePlay() {
