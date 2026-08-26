@@ -9,6 +9,8 @@ import {
   Users
 } from 'lucide-react'
 
+import { Analytics } from '@vercel/analytics/react'
+
 import GamePage
   from './pages/GamePage'
 
@@ -146,6 +148,9 @@ export default function App() {
 
 
       </main>
+
+
+      <Analytics />
 
 
     </div>
