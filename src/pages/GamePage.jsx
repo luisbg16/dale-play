@@ -7,16 +7,16 @@ import {
 import {
   Play,
   Pause,
+  Search,
   SkipForward,
-  Flag,
-  RotateCcw,
-  Trophy,
-  Search
+  ArrowRight,
+  CheckCircle2,
+  X,
+  Trophy
 } from 'lucide-react'
 
 import {
-  supabase,
-  supabaseReady
+  supabase
 } from '../lib/supabase'
 
 import {
@@ -91,7 +91,8 @@ function sameSong(song, guess) {
   if (
     song.spotify_id &&
     guess.spotify_id &&
-    song.spotify_id === guess.spotify_id
+    song.spotify_id ===
+      guess.spotify_id
   ) {
     return true
   }
@@ -119,7 +120,10 @@ function sameSong(song, guess) {
 }
 
 
-function searchLibrary(library, search) {
+function searchLibrary(
+  library,
+  search
+) {
   const needle =
     normalizeText(search)
 
@@ -186,39 +190,113 @@ function searchLibrary(library, search) {
 
 
 export default function GamePage() {
+
+  /*
+  =====================================
+  BIBLIOTECA / CANCIÓN
+  =====================================
+  */
+
   const [songs, setSongs] =
     useState([])
 
   const [song, setSong] =
     useState(null)
 
-  const [nextSong, setNextSong] =
+  const [nextSongData, setNextSongData] =
     useState(null)
-
-  const [levelIndex, setLevelIndex] =
-    useState(0)
-
-  const [status, setStatus] =
-    useState('playing')
-
-  const [score, setScore] =
-    useState(0)
-
-  const [message, setMessage] =
-    useState('')
 
   const [loading, setLoading] =
     useState(true)
 
-  const [spotifyReady, setSpotifyReady] =
+
+  /*
+  =====================================
+  JUEGO
+  =====================================
+  */
+
+  const [levelIndex, setLevelIndex] =
+    useState(0)
+
+  const [attempts, setAttempts] =
+    useState([])
+
+  const [status, setStatus] =
+    useState('playing')
+
+  const [message, setMessage] =
+    useState('')
+
+  const [score, setScore] =
+    useState(0)
+
+  const [earnedPoints, setEarnedPoints] =
+    useState(0)
+
+
+  const currentLevel =
+    LEVELS[levelIndex]
+
+
+  const isLastLevel =
+    levelIndex ===
+    LEVELS.length - 1
+
+
+  /*
+  =====================================
+  BUSCADOR
+  =====================================
+  */
+
+  const [query, setQuery] =
+    useState('')
+
+  const [
+    selectedGuess,
+    setSelectedGuess
+  ] = useState(null)
+
+  const [
+    searchResults,
+    setSearchResults
+  ] = useState([])
+
+  const [searching, setSearching] =
     useState(false)
 
-  const [isPlaying, setIsPlaying] =
+  const searchTimer =
+    useRef(null)
+
+  const skipNextSearchRef =
+    useRef(false)
+
+
+  /*
+  =====================================
+  NOMBRE / SCORE
+  =====================================
+  */
+
+  const [playerName, setPlayerName] =
+    useState('')
+
+  const [scoreSaved, setScoreSaved] =
     useState(false)
 
-  const [audioStarting, setAudioStarting] =
+  const [savingScore, setSavingScore] =
     useState(false)
 
+  const [leaderboard, setLeaderboard] =
+    useState([])
+
+
+  /*
+  =====================================
+  SPOTIFY DOBLE CONTROLLER
+  =====================================
+  */
 
   const iframeApiRef =
     useRef(null)
@@ -238,17 +316,18 @@ export default function GamePage() {
   const readyBRef =
     useRef(false)
 
-  const loadedARef =
-    useRef(null)
-
-  const loadedBRef =
-    useRef(null)
-
   const playedARef =
     useRef(false)
 
   const playedBRef =
     useRef(false)
+
+  const spotifyIdARef =
+    useRef(null)
+
+  const spotifyIdBRef =
+    useRef(null)
+
 
   const stopTimerRef =
     useRef(null)
@@ -257,100 +336,24 @@ export default function GamePage() {
     useRef(false)
 
 
-  const [query, setQuery] =
-    useState('')
+  const [spotifyReady, setSpotifyReady] =
+    useState(false)
 
-  const [
-    searchResults,
-    setSearchResults
-  ] = useState([])
+  const [isPlaying, setIsPlaying] =
+    useState(false)
 
-  const [
-    selectedGuess,
-    setSelectedGuess
-  ] = useState(null)
-
-  const [
-    searching,
-    setSearching
-  ] = useState(false)
-
-  const searchTimer =
-    useRef(null)
-
-  const skipNextSearchRef =
-    useRef(false)
+  const [audioStarting, setAudioStarting] =
+    useState(false)
 
 
-  const [attempts, setAttempts] =
-    useState([])
-
-  const [playerName, setPlayerName] =
-    useState('')
-
-  const [
-    leaderboard,
-    setLeaderboard
-  ] = useState([])
-
-  const [
-    scoreSaved,
-    setScoreSaved
-  ] = useState(false)
-
-
-  const currentLevel =
-    LEVELS[levelIndex]
-
-
-  function getActiveController() {
-    return activeSlotRef.current === 'A'
-      ? controllerARef.current
-      : controllerBRef.current
-  }
-
-
-  function activeIsReady() {
-    return activeSlotRef.current === 'A'
-      ? readyARef.current
-      : readyBRef.current
-  }
-
-
-  function activeAlreadyPlayed() {
-    return activeSlotRef.current === 'A'
-      ? playedARef.current
-      : playedBRef.current
-  }
-
-
-  function markActiveAsPlayed() {
-    if (
-      activeSlotRef.current === 'A'
-    ) {
-      playedARef.current = true
-    } else {
-      playedBRef.current = true
-    }
-  }
-
+  /*
+  =====================================
+  INICIO
+  =====================================
+  */
 
   useEffect(() => {
-    loadSongs()
-    loadLeaderboard()
-
-    loadSpotifyIframeApi()
-      .then(IFrameAPI => {
-        iframeApiRef.current =
-          IFrameAPI
-      })
-      .catch(error => {
-        console.error(error)
-
-        setMessage(
-          'No se pudo preparar Spotify.'
-        )
-      })
+    initializeGame()
 
     return () => {
       stopSpotify()
@@ -368,208 +371,217 @@ export default function GamePage() {
   }, [])
 
 
-  async function loadSongs() {
+  async function initializeGame() {
     setLoading(true)
 
-    if (!supabaseReady) {
-      setLoading(false)
-      return
-    }
 
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from('songs')
-        .select(
-          'id, title, artist, spotify_id, album_image_url, album_name, year, genre'
-        )
-        .eq(
-          'active',
-          true
-        )
+    try {
+      const {
+        data,
+        error
+      } =
+        await supabase
+          .from('songs')
+          .select('*')
+          .eq(
+            'active',
+            true
+          )
 
-    if (error) {
-      setMessage(
-        error.message
+
+      if (error) {
+        throw error
+      }
+
+
+      const library =
+        (data || [])
+          .filter(
+            item =>
+              Boolean(
+                item.spotify_id
+              )
+          )
+
+
+      setSongs(
+        library
       )
 
-      setLoading(false)
 
-      return
-    }
-
-    setSongs(
-      (data || [])
-        .filter(
-          item =>
-            Boolean(
-              item.spotify_id
-            )
+      if (!library.length) {
+        setMessage(
+          'No hay canciones disponibles.'
         )
-    )
 
-    setLoading(false)
+        setLoading(false)
+
+        return
+      }
+
+
+      const firstSong =
+        pickRandomSong(
+          library
+        )
+
+
+      const upcoming =
+        pickRandomSong(
+          library,
+          firstSong.id
+        )
+
+
+      setSong(
+        firstSong
+      )
+
+      setNextSongData(
+        upcoming
+      )
+
+
+      const IFrameAPI =
+        await loadSpotifyIframeApi()
+
+
+      iframeApiRef.current =
+        IFrameAPI
+
+
+      await createSpotifyControllers(
+        IFrameAPI,
+        firstSong,
+        upcoming
+      )
+
+
+      await loadLeaderboard()
+
+
+    } catch (error) {
+      console.error(error)
+
+      setMessage(
+        error.message ||
+        'No se pudo cargar el juego.'
+      )
+
+    } finally {
+      setLoading(false)
+    }
   }
 
 
-  useEffect(() => {
-    if (
-      loading ||
-      !songs.length ||
-      song
-    ) {
-      return
-    }
-
-    const first =
-      chooseRandomSong([])
-
-    const second =
-      chooseRandomSong([
-        first?.id
-      ])
-
-    setSong(first)
-
-    setNextSong(second)
-
-    setTimeout(
-      () => {
-        ensureControllers(
-          first,
-          second
-        )
-      },
-      0
-    )
-  }, [
-    loading,
-    songs.length
-  ])
-
-
-  function chooseRandomSong(
-    excludeIds = []
+  function pickRandomSong(
+    library,
+    excludeId = null
   ) {
-    const available =
-      songs.filter(
+    let candidates =
+      library.filter(
         item =>
-          !excludeIds.includes(
-            item.id
-          )
+          item.id !==
+          excludeId
       )
 
-    const pool =
-      available.length
-        ? available
-        : songs
 
-    if (!pool.length) {
-      return null
+    if (!candidates.length) {
+      candidates =
+        library
     }
 
-    return pool[
+
+    return candidates[
       Math.floor(
         Math.random() *
-        pool.length
+        candidates.length
       )
     ]
   }
 
 
-  async function ensureControllers(
-    current,
-    upcoming
+  /*
+  =====================================
+  SPOTIFY
+  =====================================
+  */
+
+  async function createSpotifyControllers(
+    IFrameAPI,
+    currentSong,
+    upcomingSong
   ) {
+    const elementA =
+      document.getElementById(
+        'spotify-player-a'
+      )
+
+    const elementB =
+      document.getElementById(
+        'spotify-player-b'
+      )
+
+
     if (
-      !current?.spotify_id
+      !elementA ||
+      !elementB
     ) {
+      setMessage(
+        'No se pudo montar Spotify.'
+      )
+
       return
     }
 
-    const IFrameAPI =
-      iframeApiRef.current ||
-      await loadSpotifyIframeApi()
 
-    iframeApiRef.current =
-      IFrameAPI
+    IFrameAPI.createController(
+      elementA,
+      {
+        width: '100%',
+        height: 80,
+        uri:
+          `spotify:track:${currentSong.spotify_id}`
+      },
+      controller => {
+        controllerARef.current =
+          controller
 
+        spotifyIdARef.current =
+          currentSong.spotify_id
 
-    if (
-      !controllerARef.current
-    ) {
-      const elementA =
-        document.getElementById(
-          'spotify-game-embed-a'
-        )
+        activeSlotRef.current =
+          'A'
 
-      if (elementA) {
-        IFrameAPI.createController(
-          elementA,
-          {
-            width: '100%',
-            height: 80,
-            uri:
-              `spotify:track:${current.spotify_id}`
-          },
-          controller => {
-            controllerARef.current =
-              controller
-
-            loadedARef.current =
-              current.spotify_id
-
-            playedARef.current =
-              false
-
-            setupControllerEvents(
-              controller,
-              'A'
-            )
-          }
+        setupControllerEvents(
+          controller,
+          'A'
         )
       }
-    }
+    )
 
 
-    if (
-      upcoming?.spotify_id &&
-      !controllerBRef.current
-    ) {
-      const elementB =
-        document.getElementById(
-          'spotify-game-embed-b'
-        )
+    IFrameAPI.createController(
+      elementB,
+      {
+        width: '100%',
+        height: 80,
+        uri:
+          `spotify:track:${upcomingSong.spotify_id}`
+      },
+      controller => {
+        controllerBRef.current =
+          controller
 
-      if (elementB) {
-        IFrameAPI.createController(
-          elementB,
-          {
-            width: '100%',
-            height: 80,
-            uri:
-              `spotify:track:${upcoming.spotify_id}`
-          },
-          controller => {
-            controllerBRef.current =
-              controller
+        spotifyIdBRef.current =
+          upcomingSong.spotify_id
 
-            loadedBRef.current =
-              upcoming.spotify_id
-
-            playedBRef.current =
-              false
-
-            setupControllerEvents(
-              controller,
-              'B'
-            )
-          }
+        setupControllerEvents(
+          controller,
+          'B'
         )
       }
-    }
+    )
   }
 
 
@@ -580,22 +592,29 @@ export default function GamePage() {
     controller.addListener(
       'ready',
       () => {
-        if (slot === 'A') {
+        if (
+          slot === 'A'
+        ) {
           readyARef.current =
             true
+
         } else {
           readyBRef.current =
             true
         }
 
+
         if (
           slot ===
           activeSlotRef.current
         ) {
-          setSpotifyReady(true)
+          setSpotifyReady(
+            true
+          )
         }
       }
     )
+
 
     controller.addListener(
       'playback_started',
@@ -607,63 +626,43 @@ export default function GamePage() {
           return
         }
 
-        setAudioStarting(false)
 
-        setIsPlaying(true)
+        setAudioStarting(
+          false
+        )
+
+        setIsPlaying(
+          true
+        )
       }
     )
   }
 
 
-  function preloadSongIntoSlot(
-    slot,
-    targetSong
-  ) {
+  function getActiveController() {
+    return activeSlotRef.current === 'A'
+      ? controllerARef.current
+      : controllerBRef.current
+  }
+
+
+  function activeAlreadyPlayed() {
+    return activeSlotRef.current === 'A'
+      ? playedARef.current
+      : playedBRef.current
+  }
+
+
+  function markActiveAsPlayed() {
     if (
-      !targetSong?.spotify_id
+      activeSlotRef.current === 'A'
     ) {
-      return
-    }
+      playedARef.current =
+        true
 
-    const uri =
-      `spotify:track:${targetSong.spotify_id}`
-
-    if (slot === 'A') {
-      if (
-        controllerARef.current &&
-        loadedARef.current !==
-          targetSong.spotify_id
-      ) {
-        readyARef.current =
-          false
-
-        playedARef.current =
-          false
-
-        loadedARef.current =
-          targetSong.spotify_id
-
-        controllerARef.current
-          .loadEntity(uri)
-      }
     } else {
-      if (
-        controllerBRef.current &&
-        loadedBRef.current !==
-          targetSong.spotify_id
-      ) {
-        readyBRef.current =
-          false
-
-        playedBRef.current =
-          false
-
-        loadedBRef.current =
-          targetSong.spotify_id
-
-        controllerBRef.current
-          .loadEntity(uri)
-      }
+      playedBRef.current =
+        true
     }
   }
 
@@ -673,10 +672,13 @@ export default function GamePage() {
       stopTimerRef.current
     )
 
+
     const controller =
       getActiveController()
 
+
     controller?.pause()
+
 
     setTimeout(
       () => {
@@ -685,9 +687,15 @@ export default function GamePage() {
       100
     )
 
-    setIsPlaying(false)
 
-    setAudioStarting(false)
+    setIsPlaying(
+      false
+    )
+
+    setAudioStarting(
+      false
+    )
+
 
     stoppingRef.current =
       false
@@ -701,17 +709,22 @@ export default function GamePage() {
       return
     }
 
+
     stoppingRef.current =
       true
+
 
     clearTimeout(
       stopTimerRef.current
     )
 
+
     const controller =
       getActiveController()
 
+
     controller?.pause()
+
 
     setTimeout(
       () => {
@@ -720,12 +733,14 @@ export default function GamePage() {
       80
     )
 
+
     setTimeout(
       () => {
         controller?.pause()
       },
       180
     )
+
 
     setTimeout(
       () => {
@@ -734,9 +749,15 @@ export default function GamePage() {
       350
     )
 
-    setIsPlaying(false)
 
-    setAudioStarting(false)
+    setIsPlaying(
+      false
+    )
+
+    setAudioStarting(
+      false
+    )
+
 
     setTimeout(
       () => {
@@ -752,6 +773,7 @@ export default function GamePage() {
     const controller =
       getActiveController()
 
+
     if (
       !controller ||
       !spotifyReady ||
@@ -760,28 +782,39 @@ export default function GamePage() {
       return
     }
 
+
     if (
       isPlaying ||
       audioStarting
     ) {
       hardStopSpotify()
+
       return
     }
+
 
     clearTimeout(
       stopTimerRef.current
     )
 
+
     stoppingRef.current =
       false
+
 
     const durationMs =
       currentLevel.duration *
       1000
 
-    setAudioStarting(true)
 
-    setIsPlaying(true)
+    setAudioStarting(
+      true
+    )
+
+    setIsPlaying(
+      true
+    )
+
 
     stopTimerRef.current =
       setTimeout(
@@ -791,93 +824,31 @@ export default function GamePage() {
         durationMs
       )
 
+
     if (
       activeAlreadyPlayed()
     ) {
       controller.restart()
+
     } else {
       markActiveAsPlayed()
+
       controller.play()
     }
   }
 
 
-  function pickSong() {
-    stopSpotify()
-
-    if (!songs.length) {
-      return
-    }
-
-    const incoming =
-      nextSong ||
-      chooseRandomSong([
-        song?.id
-      ])
-
-    if (!incoming) {
-      return
-    }
-
-    activeSlotRef.current =
-      activeSlotRef.current === 'A'
-        ? 'B'
-        : 'A'
-
-    setSpotifyReady(
-      activeIsReady() ||
-      Boolean(
-        getActiveController()
-      )
-    )
-
-    const upcoming =
-      chooseRandomSong([
-        incoming.id,
-        song?.id
-      ])
-
-    setSong(incoming)
-
-    setNextSong(upcoming)
-
-    setLevelIndex(0)
-
-    setAttempts([])
-
-    setQuery('')
-
-    setSelectedGuess(null)
-
-    setSearchResults([])
-
-    setMessage('')
-
-    setStatus('playing')
-
-    setScoreSaved(false)
-
-    setTimeout(
-      () => {
-        const standbySlot =
-          activeSlotRef.current === 'A'
-            ? 'B'
-            : 'A'
-
-        preloadSongIntoSlot(
-          standbySlot,
-          upcoming
-        )
-      },
-      50
-    )
-  }
-
+  /*
+  =====================================
+  BUSCADOR LOCAL
+  =====================================
+  */
 
   useEffect(() => {
     clearTimeout(
       searchTimer.current
     )
+
 
     if (
       skipNextSearchRef.current
@@ -887,6 +858,7 @@ export default function GamePage() {
 
       return
     }
+
 
     if (
       query.trim().length < 2 ||
@@ -899,25 +871,26 @@ export default function GamePage() {
       return
     }
 
+
     setSearching(true)
+
 
     searchTimer.current =
       setTimeout(
         () => {
-          const results =
+          setSearchResults(
             searchLibrary(
               songs,
               query.trim()
             )
-
-          setSearchResults(
-            results
           )
+
 
           setSearching(false)
         },
         90
       )
+
 
     return () => {
       clearTimeout(
@@ -926,8 +899,8 @@ export default function GamePage() {
     }
   }, [
     query,
-    status,
-    songs
+    songs,
+    status
   ])
 
 
@@ -935,24 +908,64 @@ export default function GamePage() {
     skipNextSearchRef.current =
       true
 
-    setSelectedGuess(track)
+
+    setSelectedGuess(
+      track
+    )
+
 
     setQuery(
       `${track.title} — ${track.artist}`
     )
 
+
     setSearchResults([])
   }
 
 
-  function advanceLevel() {
+  /*
+  =====================================
+  PASAR NIVEL / RENDIRSE
+  =====================================
+  */
+
+  function registerFailure(text) {
+    if (
+      status !== 'playing'
+    ) {
+      return
+    }
+
+
     stopSpotify()
+
+
+    setAttempts(
+      current => [
+        ...current,
+        {
+          level:
+            currentLevel.label,
+
+          text,
+
+          correct:
+            false
+        }
+      ]
+    )
+
 
     setQuery('')
 
     setSelectedGuess(null)
 
     setSearchResults([])
+
+
+    /*
+    Todavía hay otro nivel.
+    */
 
     if (
       levelIndex <
@@ -963,42 +976,46 @@ export default function GamePage() {
           current + 1
       )
 
+
+      setMessage(
+        'Pasaste al siguiente nivel.'
+      )
+
+
       return
     }
 
-    loseGame()
+
+    /*
+    Ya estaba en Fácil:
+    termina la canción.
+    */
+
+    giveUp()
   }
 
 
-  function skip() {
+  function passLevel() {
     if (
-      status !== 'playing'
+      isLastLevel
     ) {
-      return
+      registerFailure(
+        'Rendirse'
+      )
+
+    } else {
+      registerFailure(
+        'Pasar nivel'
+      )
     }
-
-    setAttempts(
-      current => [
-        ...current,
-        {
-          level:
-            currentLevel.label,
-
-          duration:
-            currentLevel.duration,
-
-          result:
-            'Saltado',
-
-          correct:
-            false
-        }
-      ]
-    )
-
-    advanceLevel()
   }
 
+
+  /*
+  =====================================
+  ADIVINAR
+  =====================================
+  */
 
   function guess() {
     if (
@@ -1006,20 +1023,36 @@ export default function GamePage() {
       !song ||
       status !== 'playing'
     ) {
-      setMessage(
-        'Selecciona una canción de la lista.'
-      )
+      if (
+        !selectedGuess
+      ) {
+        setMessage(
+          'Selecciona una canción.'
+        )
+      }
 
       return
     }
 
+
     stopSpotify()
+
 
     const correct =
       sameSong(
         song,
         selectedGuess
       )
+
+
+    if (!correct) {
+      registerFailure(
+        `${selectedGuess.title} — ${selectedGuess.artist}`
+      )
+
+      return
+    }
+
 
     setAttempts(
       current => [
@@ -1028,81 +1061,333 @@ export default function GamePage() {
           level:
             currentLevel.label,
 
-          duration:
-            currentLevel.duration,
-
-          result:
+          text:
             `${selectedGuess.title} — ${selectedGuess.artist}`,
 
-          correct
+          correct:
+            true
         }
       ]
     )
 
-    if (correct) {
-      const points =
-        currentLevel.points
 
-      setScore(
-        current =>
-          current + points
-      )
+    const points =
+      currentLevel.points
 
-      setStatus('won')
 
-      setMessage(
-        `¡Correcto! +${points} puntos`
-      )
+    setEarnedPoints(
+      points
+    )
 
-      return
-    }
+
+    setScore(
+      current =>
+        current + points
+    )
+
+
+    setStatus(
+      'won'
+    )
+
 
     setMessage(
-      'No es esa. Pasamos al siguiente nivel.'
+      `¡Correcto! +${points} pts`
     )
 
-    setTimeout(
-      () => {
-        advanceLevel()
-      },
-      550
-    )
-  }
 
+    setQuery('')
 
-  function loseGame() {
-    stopSpotify()
+    setSelectedGuess(null)
 
-    setStatus('lost')
+    setSearchResults([])
 
-    setMessage(
-      `Era “${song.title}” — ${song.artist}`
-    )
+    setScoreSaved(false)
   }
 
 
   function giveUp() {
+    stopSpotify()
+
+
+    setEarnedPoints(
+      0
+    )
+
+
+    setStatus(
+      'lost'
+    )
+
+
+    setMessage(
+      'Te rendiste.'
+    )
+
+
+    setQuery('')
+
+    setSelectedGuess(null)
+
+    setSearchResults([])
+
+    setScoreSaved(false)
+  }
+
+
+  /*
+  =====================================
+  SIGUIENTE CANCIÓN
+  =====================================
+  */
+
+  async function nextSong() {
     if (
-      status !== 'playing'
+      status === 'playing'
     ) {
       return
     }
 
-    loseGame()
+
+    stopSpotify()
+
+
+    const newCurrent =
+      nextSongData ||
+      pickRandomSong(
+        songs,
+        song?.id
+      )
+
+
+    const newUpcoming =
+      pickRandomSong(
+        songs,
+        newCurrent?.id
+      )
+
+
+    /*
+    Cambiamos al controller que ya
+    estaba precargado.
+    */
+
+    const nextSlot =
+      activeSlotRef.current === 'A'
+        ? 'B'
+        : 'A'
+
+
+    activeSlotRef.current =
+      nextSlot
+
+
+    setSong(
+      newCurrent
+    )
+
+
+    setNextSongData(
+      newUpcoming
+    )
+
+
+    setLevelIndex(
+      0
+    )
+
+    setAttempts([])
+
+    setStatus(
+      'playing'
+    )
+
+    setMessage('')
+
+    setEarnedPoints(
+      0
+    )
+
+    setQuery('')
+
+    setSelectedGuess(null)
+
+    setSearchResults([])
+
+    setScoreSaved(false)
+
+
+    /*
+    El nuevo slot activo ya contiene
+    la canción que estaba precargada.
+    */
+
+    if (
+      nextSlot === 'A'
+    ) {
+      playedARef.current =
+        false
+
+
+      setSpotifyReady(
+        readyARef.current
+      )
+
+    } else {
+      playedBRef.current =
+        false
+
+
+      setSpotifyReady(
+        readyBRef.current
+      )
+    }
+
+
+    /*
+    Ahora cargamos la próxima canción
+    en el controller que quedó libre.
+    */
+
+    const standbyController =
+      nextSlot === 'A'
+        ? controllerBRef.current
+        : controllerARef.current
+
+
+    if (
+      standbyController &&
+      newUpcoming?.spotify_id
+    ) {
+      const uri =
+        `spotify:track:${newUpcoming.spotify_id}`
+
+
+      if (
+        nextSlot === 'A'
+      ) {
+        readyBRef.current =
+          false
+
+        playedBRef.current =
+          false
+
+        spotifyIdBRef.current =
+          newUpcoming.spotify_id
+
+      } else {
+        readyARef.current =
+          false
+
+        playedARef.current =
+          false
+
+        spotifyIdARef.current =
+          newUpcoming.spotify_id
+      }
+
+
+      standbyController
+        .loadEntity(
+          uri,
+          false,
+          0
+        )
+    }
+  }
+
+
+  /*
+  =====================================
+  SCORE
+  =====================================
+  */
+
+  async function saveScore() {
+    if (
+      !playerName.trim() ||
+      scoreSaved ||
+      savingScore
+    ) {
+      return
+    }
+
+
+    setSavingScore(
+      true
+    )
+
+
+    try {
+      const {
+        error
+      } =
+        await supabase
+          .from('scores')
+          .insert({
+            player_name:
+              playerName
+                .trim()
+                .slice(
+                  0,
+                  30
+                ),
+
+            score,
+
+            song_title:
+              song?.title ||
+              null,
+
+            song_artist:
+              song?.artist ||
+              null,
+
+            difficulty:
+              currentLevel.label
+          })
+
+
+      if (error) {
+        throw error
+      }
+
+
+      setScoreSaved(
+        true
+      )
+
+
+      await loadLeaderboard()
+
+
+    } catch (error) {
+      console.error(error)
+
+
+      setMessage(
+        error.message ||
+        'No se pudo guardar el puntaje.'
+      )
+
+    } finally {
+      setSavingScore(
+        false
+      )
+    }
   }
 
 
   async function loadLeaderboard() {
-    if (!supabaseReady) {
-      return
-    }
-
     const {
-      data
+      data,
+      error
     } =
       await supabase
         .from('scores')
-        .select('*')
+        .select(
+          'id, player_name, score, created_at'
+        )
         .order(
           'score',
           {
@@ -1111,210 +1396,244 @@ export default function GamePage() {
         )
         .limit(10)
 
+
+    if (error) {
+      console.error(error)
+
+      return
+    }
+
+
     setLeaderboard(
       data || []
     )
   }
 
 
-  async function saveScore() {
-    if (
-      !playerName.trim()
-    ) {
-      setMessage(
-        'Escribe tu nombre.'
-      )
+  /*
+  =====================================
+  LOADING
+  =====================================
+  */
 
-      return
-    }
+  if (
+    loading
+  ) {
+    return (
+      <section className="game-wrap">
 
-    if (scoreSaved) {
-      return
-    }
+        <div className="notice">
+          Cargando juego...
+        </div>
 
-    const {
-      error
-    } =
-      await supabase
-        .from('scores')
-        .insert({
-          player_name:
-            playerName
-              .trim()
-              .slice(
-                0,
-                30
-              ),
-
-          score,
-
-          song_title:
-            song.title,
-
-          song_artist:
-            song.artist,
-
-          difficulty:
-            currentLevel.label
-        })
-
-    if (error) {
-      setMessage(
-        error.message
-      )
-
-      return
-    }
-
-    setScoreSaved(true)
-
-    setMessage(
-      'Puntuación guardada.'
+      </section>
     )
-
-    await loadLeaderboard()
   }
 
+
+  if (!song) {
+    return (
+      <section className="game-wrap">
+
+        <div className="notice">
+
+          {message ||
+            'No hay canciones disponibles.'}
+
+        </div>
+
+      </section>
+    )
+  }
+
+
+  /*
+  =====================================
+  UI
+  =====================================
+  */
 
   return (
     <section className="game-wrap">
 
+
+      {/*
+      Los dos embeds permanecen montados
+      para poder precargar la canción
+      siguiente.
+      */}
+
       <div className="spotify-hidden-player">
 
         <div
-          id="spotify-game-embed-a"
+          id="spotify-player-a"
         />
 
         <div
-          id="spotify-game-embed-b"
+          id="spotify-player-b"
         />
 
       </div>
 
 
-      <div className="score-pill">
+      <div className="game-header">
 
-        <Trophy size={18} />
+        <div>
 
-        {score} pts
+          <span className="game-eyebrow">
+            DALE PLAY
+          </span>
+
+          <h1>
+            ¿Qué canción es?
+          </h1>
+
+        </div>
+
+
+        <div className="game-score">
+
+          <Trophy size={18} />
+
+          {score} pts
+
+        </div>
 
       </div>
 
 
-      <div className="difficulty-row">
+      {/*
+      =====================================
+      JUGANDO
+      =====================================
+      */}
 
-        {LEVELS.map(
-          (
-            level,
-            index
-          ) => (
+      {status === 'playing' && (
 
-            <div
-              key={level.id}
-              className={
-                `level-pill ${level.id} ${
-                  index === levelIndex
-                    ? 'current'
-                    : ''
-                } ${
-                  index < levelIndex
-                    ? 'used'
-                    : ''
-                }`
-              }
-            >
+        <>
 
-              {level.label}
+          <div className="room-main-play-area">
+
+            <div className="room-level-card">
+
+              <span>
+                NIVEL ACTUAL
+              </span>
+
+              <strong>
+                {currentLevel.label}
+              </strong>
 
               <small>
-                {level.duration}s
+                {currentLevel.duration}s de canción
               </small>
 
             </div>
 
-          )
-        )}
 
-      </div>
+            <div className="difficulty-row">
 
-
-      <div className="progress">
-
-        <span
-          style={{
-            width:
-              `${
+              {LEVELS.map(
                 (
-                  (levelIndex + 1) /
-                  LEVELS.length
-                ) * 100
-              }%`
-          }}
-        />
+                  level,
+                  index
+                ) => (
 
-      </div>
+                  <div
+                    key={level.id}
+                    className={
+                      `level-pill ${level.id} ${
+                        index === levelIndex
+                          ? 'current'
+                          : ''
+                      } ${
+                        index < levelIndex
+                          ? 'used'
+                          : ''
+                      }`
+                    }
+                  >
 
+                    {level.label}
 
-      {!loading &&
-        !song && (
+                    <small>
+                      {level.duration}s
+                    </small>
 
-        <div className="notice">
+                  </div>
 
-          No hay canciones disponibles.
+                )
+              )}
 
-        </div>
-
-      )}
-
-
-      {song && (
-
-        <>
-
-          <button
-            className={
-              `play-button ${
-                audioStarting
-                  ? 'audio-starting'
-                  : ''
-              }`
-            }
-            onClick={togglePlay}
-            disabled={
-              !spotifyReady ||
-              status !== 'playing'
-            }
-          >
-
-            {isPlaying ? (
-
-              <Pause
-                size={62}
-                fill="currentColor"
-              />
-
-            ) : (
-
-              <Play
-                size={62}
-                fill="currentColor"
-              />
-
-            )}
-
-          </button>
+            </div>
 
 
-          <div className="seconds">
+            <div className="room-potential-score">
 
-            {!spotifyReady
-              ? 'Preparando...'
-              : `${currentLevel.duration}s`}
+              <strong>
+                {currentLevel.points} pts
+              </strong>
+
+              <span>
+                disponibles
+              </span>
+
+            </div>
+
+
+            <button
+              className={
+                `play-button ${
+                  audioStarting
+                    ? 'audio-starting'
+                    : ''
+                }`
+              }
+              onClick={
+                togglePlay
+              }
+              disabled={
+                !spotifyReady
+              }
+            >
+
+              {isPlaying ? (
+
+                <Pause
+                  size={58}
+                  fill="currentColor"
+                />
+
+              ) : (
+
+                <Play
+                  size={58}
+                  fill="currentColor"
+                />
+
+              )}
+
+            </button>
+
+
+            <div className="seconds">
+
+              {!spotifyReady
+                ? 'Preparando audio...'
+                : `${currentLevel.duration}s`}
+
+            </div>
 
           </div>
 
 
-          <div className="guess-area">
+          {/*
+          =====================================
+          BUSCADOR + ACCIONES
+          =====================================
+          */}
+
+          <div className="guess-area room-mobile-controls">
 
             <div className="autocomplete">
 
@@ -1322,16 +1641,14 @@ export default function GamePage() {
 
                 <Search size={20} />
 
+
                 <input
                   value={query}
                   placeholder="Busca una canción..."
-                  disabled={
-                    status !== 'playing'
-                  }
                   onChange={
-                    e => {
+                    event => {
                       setQuery(
-                        e.target.value
+                        event.target.value
                       )
 
                       setSelectedGuess(
@@ -1347,9 +1664,7 @@ export default function GamePage() {
               {searching && (
 
                 <div className="spotify-searching">
-
                   Buscando canciones...
-
                 </div>
 
               )}
@@ -1363,8 +1678,8 @@ export default function GamePage() {
                     track => (
 
                       <button
-                        type="button"
                         key={track.id}
+                        type="button"
                         onClick={
                           () =>
                             selectGuess(
@@ -1414,80 +1729,45 @@ export default function GamePage() {
               <button
                 className="guess-btn"
                 onClick={guess}
-                disabled={
-                  status !== 'playing'
-                }
               >
-
                 Adivinar
-
               </button>
 
 
               <button
-                className="skip-inline-btn"
-                onClick={skip}
-                disabled={
-                  status !== 'playing'
+                className={
+                  `skip-inline-btn ${
+                    isLastLevel
+                      ? 'give-up'
+                      : ''
+                  }`
+                }
+                onClick={
+                  passLevel
                 }
               >
 
                 <SkipForward />
 
-                Saltar
+
+                {isLastLevel
+                  ? 'Rendirse'
+                  : 'Pasar nivel'}
 
               </button>
 
             </div>
-
-          </div>
-
-
-          <div className="single-action">
-
-            <button
-              onClick={giveUp}
-              disabled={
-                status !== 'playing'
-              }
-            >
-
-              <Flag />
-
-              Rendirse
-
-            </button>
 
           </div>
 
 
           {message && (
 
-            <div
-              className={
-                `message ${status}`
-              }
-            >
+            <div className="message">
 
               {message}
 
             </div>
-
-          )}
-
-
-          {status !== 'playing' && (
-
-            <button
-              className="next-btn next-song-immediate"
-              onClick={pickSong}
-            >
-
-              <RotateCcw />
-
-              Siguiente canción
-
-            </button>
 
           )}
 
@@ -1497,20 +1777,20 @@ export default function GamePage() {
             <div className="attempt-history">
 
               <h3>
-                Intentos
+                Tus intentos
               </h3>
 
 
               {attempts.map(
                 (
-                  attempt,
+                  item,
                   index
                 ) => (
 
                   <div
                     className={
                       `attempt-row ${
-                        attempt.correct
+                        item.correct
                           ? 'correct'
                           : ''
                       }`
@@ -1520,154 +1800,22 @@ export default function GamePage() {
 
                     <span className="attempt-number">
 
-                      {index + 1}
+                      {item.correct
+                        ? '✓'
+                        : '✕'}
 
                     </span>
 
 
-                    <span>
-
-                      <strong>
-                        {attempt.level}
-                      </strong>
-
-                      <small>
-                        {attempt.duration}s
-                      </small>
-
-                    </span>
+                    <strong>
+                      {item.level}
+                    </strong>
 
 
                     <span className="attempt-answer">
 
-                      {attempt.result}
+                      {item.text}
 
-                    </span>
-
-                  </div>
-
-                )
-              )}
-
-            </div>
-
-          )}
-
-
-          {status !== 'playing' && (
-
-            <>
-
-              <div className="song-reveal">
-
-                {song.album_image_url && (
-
-                  <img
-                    src={
-                      song.album_image_url
-                    }
-                    alt=""
-                  />
-
-                )}
-
-
-                <div>
-
-                  <span>
-
-                    {status === 'won'
-                      ? '¡La pegaste!'
-                      : 'La canción era'}
-
-                  </span>
-
-                  <h2>
-                    {song.title}
-                  </h2>
-
-                  <p>
-                    {song.artist}
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              <div className="save-score-card">
-
-                <h3>
-                  Guardar puntuación
-                </h3>
-
-
-                <div className="save-score-form">
-
-                  <input
-                    maxLength={30}
-                    placeholder="Tu nombre"
-                    value={playerName}
-                    onChange={
-                      e =>
-                        setPlayerName(
-                          e.target.value
-                        )
-                    }
-                  />
-
-
-                  <button
-                    className="primary"
-                    onClick={saveScore}
-                    disabled={scoreSaved}
-                  >
-
-                    {scoreSaved
-                      ? 'Guardado ✓'
-                      : `Guardar ${score} pts`}
-
-                  </button>
-
-                </div>
-
-              </div>
-
-            </>
-
-          )}
-
-
-          {leaderboard.length > 0 && (
-
-            <div className="leaderboard">
-
-              <h3>
-                🏆 Mejores puntuaciones
-              </h3>
-
-
-              {leaderboard.map(
-                (
-                  item,
-                  index
-                ) => (
-
-                  <div
-                    className="leaderboard-row"
-                    key={item.id}
-                  >
-
-                    <span>
-                      #{index + 1}
-                    </span>
-
-                    <strong>
-                      {item.player_name}
-                    </strong>
-
-                    <span>
-                      {item.score} pts
                     </span>
 
                   </div>
@@ -1680,6 +1828,259 @@ export default function GamePage() {
           )}
 
         </>
+
+      )}
+
+
+      {/*
+      =====================================
+      RESULTADO
+      =====================================
+      */}
+
+      {status !== 'playing' && (
+
+        <div className="game-result-card">
+
+
+          {song.album_image_url && (
+
+            <img
+              src={
+                song.album_image_url
+              }
+              alt=""
+            />
+
+          )}
+
+
+          {status === 'won' ? (
+
+            <CheckCircle2
+              size={34}
+            />
+
+          ) : (
+
+            <X
+              size={34}
+            />
+
+          )}
+
+
+          <span>
+
+            {status === 'won'
+              ? '¡La pegaste!'
+              : 'La canción era'}
+
+          </span>
+
+
+          <h2>
+            {song.title}
+          </h2>
+
+
+          <p>
+            {song.artist}
+          </p>
+
+
+          {status === 'won' && (
+
+            <strong className="round-earned">
+
+              +{earnedPoints} pts
+
+            </strong>
+
+          )}
+
+
+          {/*
+          LO PRIMERO DESPUÉS DEL RESULTADO:
+          siguiente canción.
+          */}
+
+          <button
+            className="primary next-song-immediate"
+            onClick={
+              nextSong
+            }
+          >
+
+            <ArrowRight />
+
+            Siguiente canción
+
+          </button>
+
+
+          {attempts.length > 0 && (
+
+            <div className="attempt-history">
+
+              <h3>
+                Tus intentos
+              </h3>
+
+
+              {attempts.map(
+                (
+                  item,
+                  index
+                ) => (
+
+                  <div
+                    className={
+                      `attempt-row ${
+                        item.correct
+                          ? 'correct'
+                          : ''
+                      }`
+                    }
+                    key={index}
+                  >
+
+                    <span className="attempt-number">
+
+                      {item.correct
+                        ? '✓'
+                        : '✕'}
+
+                    </span>
+
+
+                    <strong>
+                      {item.level}
+                    </strong>
+
+
+                    <span className="attempt-answer">
+
+                      {item.text}
+
+                    </span>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
+
+
+          <div className="save-score-card">
+
+            <h3>
+              Guardar puntaje
+            </h3>
+
+
+            <p>
+
+              Puntaje acumulado:
+              {' '}
+
+              <strong>
+                {score} pts
+              </strong>
+
+            </p>
+
+
+            <input
+              value={playerName}
+              maxLength={30}
+              placeholder="Tu nombre"
+              disabled={
+                scoreSaved
+              }
+              onChange={
+                event =>
+                  setPlayerName(
+                    event.target.value
+                  )
+              }
+            />
+
+
+            <button
+              className="primary"
+              onClick={
+                saveScore
+              }
+              disabled={
+                !playerName.trim() ||
+                scoreSaved ||
+                savingScore
+              }
+            >
+
+              {savingScore
+                ? 'Guardando...'
+                : scoreSaved
+                  ? 'Puntaje guardado'
+                  : 'Guardar puntaje'}
+
+            </button>
+
+          </div>
+
+
+          {leaderboard.length > 0 && (
+
+            <div className="live-scoreboard">
+
+              <h3>
+
+                <Trophy size={19} />
+
+                Mejores puntajes
+
+              </h3>
+
+
+              {leaderboard.map(
+                (
+                  item,
+                  index
+                ) => (
+
+                  <div
+                    className="live-score-row"
+                    key={item.id}
+                  >
+
+                    <span>
+                      #{index + 1}
+                    </span>
+
+
+                    <strong>
+                      {item.player_name}
+                    </strong>
+
+
+                    <b>
+                      {item.score} pts
+                    </b>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
+
+        </div>
 
       )}
 
