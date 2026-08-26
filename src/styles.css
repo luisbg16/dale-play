@@ -3707,3 +3707,107 @@ h2 {
     font-size: 1.3rem;
   }
 }
+@media (max-width: 700px) {
+
+  .solo-game {
+    width: min(100% - 22px, 520px);
+    min-height: 100dvh;
+    padding: 26px 0 120px;
+
+    display: flex;
+    flex-direction: column;
+  }
+
+  .solo-top {
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 18px;
+  }
+
+  .solo-intro {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .solo-intro strong {
+    font-size: .78rem;
+    letter-spacing: .08em;
+    color: #ff8a42;
+  }
+
+  .solo-intro span {
+    font-size: 1rem;
+    font-weight: 700;
+    color: rgba(255,255,255,.9);
+  }
+
+  .solo-score {
+    font-size: .78rem;
+    font-weight: 800;
+    color: rgba(255,255,255,.55);
+  }
+
+  .solo-levels {
+    gap: 5px;
+    margin-bottom: 34px;
+  }
+
+  .solo-level {
+    padding: 8px 3px;
+  }
+
+  .solo-level strong {
+    font-size: .66rem;
+  }
+
+  .solo-level small {
+    font-size: .58rem;
+  }
+
+  .solo-play {
+    width: 108px;
+    height: 108px;
+    margin: 0 auto;
+  }
+
+  .solo-play svg {
+    width: 50px;
+    height: 50px;
+  }
+
+  .solo-duration {
+    margin: 12px 0 28px;
+    font-size: .82rem;
+  }
+
+  .solo-controls {
+    margin-top: auto;
+    position: sticky;
+
+    bottom:
+      max(
+        10px,
+        env(safe-area-inset-bottom)
+      );
+
+    z-index: 50;
+
+    padding: 9px;
+
+    border-radius: 18px;
+
+    border:
+      1px solid
+      rgba(255,255,255,.08);
+
+    background:
+      rgba(17,17,17,.95);
+
+    backdrop-filter:
+      blur(18px);
+
+    -webkit-backdrop-filter:
+      blur(18px);
+  }
+}
