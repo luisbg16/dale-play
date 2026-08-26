@@ -84,11 +84,9 @@ function normalizeArtist(value = '') {
 
 
 function sameSong(song, guess) {
-
   if (!song || !guess) {
     return false
   }
-
 
   if (
     song.spotify_id &&
@@ -97,7 +95,6 @@ function sameSong(song, guess) {
   ) {
     return true
   }
-
 
   const songTitle =
     normalizeText(song.title)
@@ -111,130 +108,84 @@ function sameSong(song, guess) {
   const guessArtist =
     normalizeArtist(guess.artist)
 
-  const hardStopAtRef =
-  useRef(null)
-
-const stopFrameRef =
-  useRef(null)
-
-const pauseHammerRef =
-  useRef(null)    
-
   return (
     songTitle === guessTitle &&
     (
       songArtist === guessArtist ||
-      songArtist.includes(
-        guessArtist
-      ) ||
-      guessArtist.includes(
-        songArtist
-      )
+      songArtist.includes(guessArtist) ||
+      guessArtist.includes(songArtist)
     )
   )
 }
 
 
-function searchLibrary(
-  library,
-  search
-) {
-
+function searchLibrary(library, search) {
   const needle =
     normalizeText(search)
-
 
   if (!needle) {
     return []
   }
 
+  return library
+    .map(song => {
+      const title =
+        normalizeText(song.title)
 
-  /*
-  Primero priorizamos coincidencias
-  que empiezan con lo escrito.
-  */
+      const artist =
+        normalizeText(song.artist)
 
-  const ranked =
-    library
-      .map(song => {
+      const combined =
+        `${title} ${artist}`
 
-        const title =
-          normalizeText(song.title)
+      let score = 0
 
-        const artist =
-          normalizeText(song.artist)
+      if (title === needle) {
+        score = 100
+      } else if (
+        title.startsWith(needle)
+      ) {
+        score = 90
+      } else if (
+        artist.startsWith(needle)
+      ) {
+        score = 80
+      } else if (
+        title.includes(needle)
+      ) {
+        score = 70
+      } else if (
+        artist.includes(needle)
+      ) {
+        score = 60
+      } else if (
+        combined.includes(needle)
+      ) {
+        score = 50
+      }
 
-        const combined =
-          `${title} ${artist}`
-
-
-        let score = 0
-
-
-        if (title === needle) {
-          score = 100
-
-        } else if (
-          title.startsWith(needle)
-        ) {
-          score = 90
-
-        } else if (
-          artist.startsWith(needle)
-        ) {
-          score = 80
-
-        } else if (
-          title.includes(needle)
-        ) {
-          score = 70
-
-        } else if (
-          artist.includes(needle)
-        ) {
-          score = 60
-
-        } else if (
-          combined.includes(needle)
-        ) {
-          score = 50
-        }
-
-
-        return {
-          song,
-          score
-        }
-      })
-      .filter(
-        item =>
-          item.score > 0
-      )
-      .sort(
-        (a, b) =>
-          b.score - a.score
-      )
-      .slice(
-        0,
-        8
-      )
-
-
-  return ranked.map(
-    item =>
-      item.song
-  )
+      return {
+        song,
+        score
+      }
+    })
+    .filter(
+      item =>
+        item.score > 0
+    )
+    .sort(
+      (a, b) =>
+        b.score - a.score
+    )
+    .slice(0, 8)
+    .map(
+      item =>
+        item.song
+    )
 }
 
 
 export default function GamePage() {
-
-  /*
-  =====================================
-  JUEGO
-  =====================================
-  */
-
   const [songs, setSongs] =
     useState([])
 
@@ -258,13 +209,6 @@ export default function GamePage() {
 
   const [loading, setLoading] =
     useState(true)
-
-
-  /*
-  =====================================
-  SPOTIFY
-  =====================================
-  */
 
   const [spotifyReady, setSpotifyReady] =
     useState(false)
@@ -306,37 +250,12 @@ export default function GamePage() {
   const playedBRef =
     useRef(false)
 
-
-  /*
-  =====================================
-  CONTROL DE AUDIO
-  =====================================
-  */
-
-  const targetDurationRef =
+  const stopTimerRef =
     useRef(null)
-
-  const playingRequestRef =
-    useRef(false)
 
   const stoppingRef =
     useRef(false)
 
-  const playbackWatchdogRef =
-    useRef(null)
-
-  const playbackStartedAtRef =
-    useRef(null)
-
-  const fallbackTimerRef =
-    useRef(null)
-
-
-  /*
-  =====================================
-  BUSCADOR LOCAL
-  =====================================
-  */
 
   const [query, setQuery] =
     useState('')
@@ -363,12 +282,6 @@ export default function GamePage() {
     useRef(false)
 
 
-  /*
-  =====================================
-  RESULTADOS
-  =====================================
-  */
-
   const [attempts, setAttempts] =
     useState([])
 
@@ -390,14 +303,7 @@ export default function GamePage() {
     LEVELS[levelIndex]
 
 
-  /*
-  =====================================
-  HELPERS SPOTIFY
-  =====================================
-  */
-
   function getActiveController() {
-
     return activeSlotRef.current === 'A'
       ? controllerARef.current
       : controllerBRef.current
@@ -405,7 +311,6 @@ export default function GamePage() {
 
 
   function activeIsReady() {
-
     return activeSlotRef.current === 'A'
       ? readyARef.current
       : readyBRef.current
@@ -413,7 +318,6 @@ export default function GamePage() {
 
 
   function activeAlreadyPlayed() {
-
     return activeSlotRef.current === 'A'
       ? playedARef.current
       : playedBRef.current
@@ -421,59 +325,39 @@ export default function GamePage() {
 
 
   function markActiveAsPlayed() {
-
     if (
       activeSlotRef.current === 'A'
     ) {
-
-      playedARef.current =
-        true
-
+      playedARef.current = true
     } else {
-
-      playedBRef.current =
-        true
+      playedBRef.current = true
     }
   }
 
 
-  /*
-  =====================================
-  INICIO
-  =====================================
-  */
-
   useEffect(() => {
-
     loadSongs()
     loadLeaderboard()
 
-
     loadSpotifyIframeApi()
       .then(IFrameAPI => {
-
         iframeApiRef.current =
           IFrameAPI
-
       })
       .catch(error => {
-
         console.error(error)
 
         setMessage(
-          'No se pudo preparar el reproductor.'
+          'No se pudo preparar Spotify.'
         )
       })
 
-
     return () => {
-
       stopSpotify()
 
       clearTimeout(
         searchTimer.current
       )
-
 
       controllerARef.current
         ?.destroy?.()
@@ -481,28 +365,16 @@ export default function GamePage() {
       controllerBRef.current
         ?.destroy?.()
     }
-
   }, [])
 
 
-  /*
-  =====================================
-  CARGAR CANCIONES
-  =====================================
-  */
-
   async function loadSongs() {
-
     setLoading(true)
 
-
     if (!supabaseReady) {
-
       setLoading(false)
-
       return
     }
-
 
     const {
       data,
@@ -518,9 +390,7 @@ export default function GamePage() {
           true
         )
 
-
     if (error) {
-
       setMessage(
         error.message
       )
@@ -529,7 +399,6 @@ export default function GamePage() {
 
       return
     }
-
 
     setSongs(
       (data || [])
@@ -541,19 +410,11 @@ export default function GamePage() {
         )
     )
 
-
     setLoading(false)
   }
 
 
-  /*
-  =====================================
-  PRIMERA CANCIÓN
-  =====================================
-  */
-
   useEffect(() => {
-
     if (
       loading ||
       !songs.length ||
@@ -562,34 +423,27 @@ export default function GamePage() {
       return
     }
 
-
     const first =
       chooseRandomSong([])
-
 
     const second =
       chooseRandomSong([
         first?.id
       ])
 
-
     setSong(first)
 
     setNextSong(second)
 
-
     setTimeout(
       () => {
-
         ensureControllers(
           first,
           second
         )
-
       },
       0
     )
-
   }, [
     loading,
     songs.length
@@ -599,7 +453,6 @@ export default function GamePage() {
   function chooseRandomSong(
     excludeIds = []
   ) {
-
     const available =
       songs.filter(
         item =>
@@ -608,17 +461,14 @@ export default function GamePage() {
           )
       )
 
-
     const pool =
       available.length
         ? available
         : songs
 
-
     if (!pool.length) {
       return null
     }
-
 
     return pool[
       Math.floor(
@@ -629,28 +479,19 @@ export default function GamePage() {
   }
 
 
-  /*
-  =====================================
-  CREAR DOBLE CONTROLLER
-  =====================================
-  */
-
   async function ensureControllers(
     current,
     upcoming
   ) {
-
     if (
       !current?.spotify_id
     ) {
       return
     }
 
-
     const IFrameAPI =
       iframeApiRef.current ||
       await loadSpotifyIframeApi()
-
 
     iframeApiRef.current =
       IFrameAPI
@@ -659,15 +500,12 @@ export default function GamePage() {
     if (
       !controllerARef.current
     ) {
-
       const elementA =
         document.getElementById(
           'spotify-game-embed-a'
         )
 
-
       if (elementA) {
-
         IFrameAPI.createController(
           elementA,
           {
@@ -677,7 +515,6 @@ export default function GamePage() {
               `spotify:track:${current.spotify_id}`
           },
           controller => {
-
             controllerARef.current =
               controller
 
@@ -686,7 +523,6 @@ export default function GamePage() {
 
             playedARef.current =
               false
-
 
             setupControllerEvents(
               controller,
@@ -702,15 +538,12 @@ export default function GamePage() {
       upcoming?.spotify_id &&
       !controllerBRef.current
     ) {
-
       const elementB =
         document.getElementById(
           'spotify-game-embed-b'
         )
 
-
       if (elementB) {
-
         IFrameAPI.createController(
           elementB,
           {
@@ -720,7 +553,6 @@ export default function GamePage() {
               `spotify:track:${upcoming.spotify_id}`
           },
           controller => {
-
             controllerBRef.current =
               controller
 
@@ -729,7 +561,6 @@ export default function GamePage() {
 
             playedBRef.current =
               false
-
 
             setupControllerEvents(
               controller,
@@ -746,65 +577,41 @@ export default function GamePage() {
     controller,
     slot
   ) {
-
     controller.addListener(
       'ready',
       () => {
-
         if (slot === 'A') {
-
           readyARef.current =
             true
-
         } else {
-
           readyBRef.current =
             true
         }
-
 
         if (
           slot ===
           activeSlotRef.current
         ) {
-
           setSpotifyReady(true)
         }
       }
     )
 
-controller.addListener(
-  'playback_started',
-  () => {
+    controller.addListener(
+      'playback_started',
+      () => {
+        if (
+          slot !==
+          activeSlotRef.current
+        ) {
+          return
+        }
 
-    if (
-      slot !==
-      activeSlotRef.current
-    ) {
-      return
-    }
+        setAudioStarting(false)
 
-
-    if (
-      !playingRequestRef.current
-    ) {
-      return
-    }
-
-
-    /*
-    Solo actualizamos la UI.
-
-    YA NO dependemos de este evento
-    para crear el timer.
-    */
-
-    setAudioStarting(false)
-
-    setIsPlaying(true)
-  }
-)
-
+        setIsPlaying(true)
+      }
+    )
   }
 
 
@@ -812,26 +619,21 @@ controller.addListener(
     slot,
     targetSong
   ) {
-
     if (
       !targetSong?.spotify_id
     ) {
       return
     }
 
-
     const uri =
       `spotify:track:${targetSong.spotify_id}`
 
-
     if (slot === 'A') {
-
       if (
         controllerARef.current &&
         loadedARef.current !==
           targetSong.spotify_id
       ) {
-
         readyARef.current =
           false
 
@@ -841,20 +643,15 @@ controller.addListener(
         loadedARef.current =
           targetSong.spotify_id
 
-
         controllerARef.current
           .loadEntity(uri)
       }
-
-
     } else {
-
       if (
         controllerBRef.current &&
         loadedBRef.current !==
           targetSong.spotify_id
       ) {
-
         readyBRef.current =
           false
 
@@ -864,7 +661,6 @@ controller.addListener(
         loadedBRef.current =
           targetSong.spotify_id
 
-
         controllerBRef.current
           .loadEntity(uri)
       }
@@ -872,157 +668,146 @@ controller.addListener(
   }
 
 
-  /*
-  =====================================
-  AUDIO
-  =====================================
-  */
+  function stopSpotify() {
+    clearTimeout(
+      stopTimerRef.current
+    )
 
-function forceStopSpotify() {
+    const controller =
+      getActiveController()
 
-  if (
-    stoppingRef.current
-  ) {
-    return
+    controller?.pause()
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      100
+    )
+
+    setIsPlaying(false)
+
+    setAudioStarting(false)
+
+    stoppingRef.current =
+      false
   }
 
 
-  stoppingRef.current =
-    true
+  function hardStopSpotify() {
+    if (
+      stoppingRef.current
+    ) {
+      return
+    }
+
+    stoppingRef.current =
+      true
+
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+    const controller =
+      getActiveController()
+
+    controller?.pause()
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      80
+    )
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      180
+    )
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      350
+    )
+
+    setIsPlaying(false)
+
+    setAudioStarting(false)
+
+    setTimeout(
+      () => {
+        stoppingRef.current =
+          false
+      },
+      450
+    )
+  }
 
 
-  clearTimeout(
-    fallbackTimerRef.current
-  )
+  function togglePlay() {
+    const controller =
+      getActiveController()
 
-  clearInterval(
-    playbackWatchdogRef.current
-  )
+    if (
+      !controller ||
+      !spotifyReady ||
+      status !== 'playing'
+    ) {
+      return
+    }
 
+    if (
+      isPlaying ||
+      audioStarting
+    ) {
+      hardStopSpotify()
+      return
+    }
 
-  playingRequestRef.current =
-    false
+    clearTimeout(
+      stopTimerRef.current
+    )
 
-  targetDurationRef.current =
-    null
+    stoppingRef.current =
+      false
 
+    const durationMs =
+      currentLevel.duration *
+      1000
 
-  const controller =
-    getActiveController()
+    setAudioStarting(true)
 
+    setIsPlaying(true)
 
-  /*
-  Spotify puede tardar en obedecer.
-  Le mandamos varias pausas.
-  */
+    stopTimerRef.current =
+      setTimeout(
+        () => {
+          hardStopSpotify()
+        },
+        durationMs
+      )
 
-  controller?.pause()
+    if (
+      activeAlreadyPlayed()
+    ) {
+      controller.restart()
+    } else {
+      markActiveAsPlayed()
+      controller.play()
+    }
+  }
 
-
-  setTimeout(
-    () => {
-      controller?.pause()
-    },
-    80
-  )
-
-
-  setTimeout(
-    () => {
-      controller?.pause()
-    },
-    180
-  )
-
-
-  setTimeout(
-    () => {
-      controller?.pause()
-    },
-    350
-  )
-
-
-  setAudioStarting(false)
-
-  setIsPlaying(false)
-
-
-  setTimeout(
-    () => {
-
-      stoppingRef.current =
-        false
-
-    },
-    450
-  )
-}
-
-
-function stopSpotify() {
-
-  clearTimeout(
-    fallbackTimerRef.current
-  )
-
-  clearInterval(
-    playbackWatchdogRef.current
-  )
-
-
-  playingRequestRef.current =
-    false
-
-  targetDurationRef.current =
-    null
-
-  stoppingRef.current =
-    false
-
-
-  controllerARef.current
-    ?.pause()
-
-  controllerBRef.current
-    ?.pause()
-
-
-  setAudioStarting(false)
-
-  setIsPlaying(false)
-}
-
-
-  if (
-  activeAlreadyPlayed()
-) {
-
-  controller.restart()
-
-} else {
-
-  markActiveAsPlayed()
-
-  controller.play()
-}
-
-
-  /*
-  =====================================
-  SIGUIENTE CANCIÓN
-  =====================================
-  */
 
   function pickSong() {
-
     stopSpotify()
-
 
     if (!songs.length) {
       return
     }
-
 
     const incoming =
       nextSong ||
@@ -1030,17 +815,14 @@ function stopSpotify() {
         song?.id
       ])
 
-
     if (!incoming) {
       return
     }
-
 
     activeSlotRef.current =
       activeSlotRef.current === 'A'
         ? 'B'
         : 'A'
-
 
     setSpotifyReady(
       activeIsReady() ||
@@ -1049,18 +831,15 @@ function stopSpotify() {
       )
     )
 
-
     const upcoming =
       chooseRandomSong([
         incoming.id,
         song?.id
       ])
 
-
     setSong(incoming)
 
     setNextSong(upcoming)
-
 
     setLevelIndex(0)
 
@@ -1078,56 +857,41 @@ function stopSpotify() {
 
     setScoreSaved(false)
 
-
     setTimeout(
       () => {
-
         const standbySlot =
           activeSlotRef.current === 'A'
             ? 'B'
             : 'A'
 
-
         preloadSongIntoSlot(
           standbySlot,
           upcoming
         )
-
       },
       50
     )
   }
 
 
-  /*
-  =====================================
-  BUSCADOR LOCAL
-  =====================================
-  */
-
   useEffect(() => {
-
     clearTimeout(
       searchTimer.current
     )
 
-
     if (
       skipNextSearchRef.current
     ) {
-
       skipNextSearchRef.current =
         false
 
       return
     }
 
-
     if (
       query.trim().length < 2 ||
       status !== 'playing'
     ) {
-
       setSearchResults([])
 
       setSearching(false)
@@ -1135,39 +899,31 @@ function stopSpotify() {
       return
     }
 
-
     setSearching(true)
-
 
     searchTimer.current =
       setTimeout(
         () => {
-
           const results =
             searchLibrary(
               songs,
               query.trim()
             )
 
-
           setSearchResults(
             results
           )
 
           setSearching(false)
-
         },
         90
       )
 
-
     return () => {
-
       clearTimeout(
         searchTimer.current
       )
     }
-
   }, [
     query,
     status,
@@ -1176,31 +932,20 @@ function stopSpotify() {
 
 
   function selectGuess(track) {
-
     skipNextSearchRef.current =
       true
 
-
     setSelectedGuess(track)
-
 
     setQuery(
       `${track.title} — ${track.artist}`
     )
 
-
     setSearchResults([])
   }
 
 
-  /*
-  =====================================
-  JUEGO
-  =====================================
-  */
-
   function advanceLevel() {
-
     stopSpotify()
 
     setQuery('')
@@ -1209,12 +954,10 @@ function stopSpotify() {
 
     setSearchResults([])
 
-
     if (
       levelIndex <
       LEVELS.length - 1
     ) {
-
       setLevelIndex(
         current =>
           current + 1
@@ -1223,19 +966,16 @@ function stopSpotify() {
       return
     }
 
-
     loseGame()
   }
 
 
   function skip() {
-
     if (
       status !== 'playing'
     ) {
       return
     }
-
 
     setAttempts(
       current => [
@@ -1256,19 +996,16 @@ function stopSpotify() {
       ]
     )
 
-
     advanceLevel()
   }
 
 
   function guess() {
-
     if (
       !selectedGuess ||
       !song ||
       status !== 'playing'
     ) {
-
       setMessage(
         'Selecciona una canción de la lista.'
       )
@@ -1276,16 +1013,13 @@ function stopSpotify() {
       return
     }
 
-
     stopSpotify()
-
 
     const correct =
       sameSong(
         song,
         selectedGuess
       )
-
 
     setAttempts(
       current => [
@@ -1305,21 +1039,16 @@ function stopSpotify() {
       ]
     )
 
-
     if (correct) {
-
       const points =
         currentLevel.points
-
 
       setScore(
         current =>
           current + points
       )
 
-
       setStatus('won')
-
 
       setMessage(
         `¡Correcto! +${points} puntos`
@@ -1328,17 +1057,13 @@ function stopSpotify() {
       return
     }
 
-
     setMessage(
       'No es esa. Pasamos al siguiente nivel.'
     )
 
-
     setTimeout(
       () => {
-
         advanceLevel()
-
       },
       550
     )
@@ -1346,11 +1071,9 @@ function stopSpotify() {
 
 
   function loseGame() {
-
     stopSpotify()
 
     setStatus('lost')
-
 
     setMessage(
       `Era “${song.title}” — ${song.artist}`
@@ -1359,30 +1082,20 @@ function stopSpotify() {
 
 
   function giveUp() {
-
     if (
       status !== 'playing'
     ) {
       return
     }
 
-
     loseGame()
   }
 
 
-  /*
-  =====================================
-  RANKING
-  =====================================
-  */
-
   async function loadLeaderboard() {
-
     if (!supabaseReady) {
       return
     }
-
 
     const {
       data
@@ -1398,7 +1111,6 @@ function stopSpotify() {
         )
         .limit(10)
 
-
     setLeaderboard(
       data || []
     )
@@ -1406,11 +1118,9 @@ function stopSpotify() {
 
 
   async function saveScore() {
-
     if (
       !playerName.trim()
     ) {
-
       setMessage(
         'Escribe tu nombre.'
       )
@@ -1418,11 +1128,9 @@ function stopSpotify() {
       return
     }
 
-
     if (scoreSaved) {
       return
     }
-
 
     const {
       error
@@ -1430,7 +1138,6 @@ function stopSpotify() {
       await supabase
         .from('scores')
         .insert({
-
           player_name:
             playerName
               .trim()
@@ -1451,9 +1158,7 @@ function stopSpotify() {
             currentLevel.label
         })
 
-
     if (error) {
-
       setMessage(
         error.message
       )
@@ -1461,29 +1166,18 @@ function stopSpotify() {
       return
     }
 
-
     setScoreSaved(true)
-
 
     setMessage(
       'Puntuación guardada.'
     )
 
-
     await loadLeaderboard()
   }
 
 
-  /*
-  =====================================
-  UI
-  =====================================
-  */
-
   return (
-
     <section className="game-wrap">
-
 
       <div className="spotify-hidden-player">
 
@@ -1636,7 +1330,6 @@ function stopSpotify() {
                   }
                   onChange={
                     e => {
-
                       setQuery(
                         e.target.value
                       )
