@@ -1238,25 +1238,17 @@ export default function GamePage() {
         <>
 
 
-          <div className="solo-top">
+        <div className="solo-top">
 
-  <div className="solo-intro">
+          <h1>
+            Adivina la canción
+          </h1>
 
-    <strong>
-      DALE PLAY
-    </strong>
+          <span className="solo-score">
+            {score} pts
+          </span>
 
-    <span>
-      Adivina la canción
-    </span>
-
-  </div>
-
-  <div className="solo-score">
-    {score} pts
-  </div>
-
-</div>
+        </div>
 
 
           <div className="solo-levels">
