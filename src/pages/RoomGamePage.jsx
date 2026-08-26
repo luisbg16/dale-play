@@ -134,38 +134,98 @@ function sameSong(song, guess) {
     songTitle === guessTitle &&
     (
       songArtist === guessArtist ||
-      songArtist.includes(guessArtist) ||
-      guessArtist.includes(songArtist)
+      songArtist.includes(
+        guessArtist
+      ) ||
+      guessArtist.includes(
+        songArtist
+      )
     )
   )
 }
 
 
-function dedupeTracks(tracks = []) {
+function searchLibrary(
+  library,
+  search
+) {
 
-  const map =
-    new Map()
-
-
-  for (const track of tracks) {
-
-    const key =
-      `${normalizeText(track.title)}::${normalizeArtist(track.artist)}`
+  const needle =
+    normalizeText(search)
 
 
-    if (!map.has(key)) {
-
-      map.set(
-        key,
-        track
-      )
-    }
+  if (!needle) {
+    return []
   }
 
 
-  return Array.from(
-    map.values()
-  )
+  return library
+    .map(song => {
+
+      const title =
+        normalizeText(song.title)
+
+      const artist =
+        normalizeText(song.artist)
+
+      const combined =
+        `${title} ${artist}`
+
+
+      let score = 0
+
+
+      if (title === needle) {
+        score = 100
+
+      } else if (
+        title.startsWith(needle)
+      ) {
+        score = 90
+
+      } else if (
+        artist.startsWith(needle)
+      ) {
+        score = 80
+
+      } else if (
+        title.includes(needle)
+      ) {
+        score = 70
+
+      } else if (
+        artist.includes(needle)
+      ) {
+        score = 60
+
+      } else if (
+        combined.includes(needle)
+      ) {
+        score = 50
+      }
+
+
+      return {
+        song,
+        score
+      }
+    })
+    .filter(
+      item =>
+        item.score > 0
+    )
+    .sort(
+      (a, b) =>
+        b.score - a.score
+    )
+    .slice(
+      0,
+      8
+    )
+    .map(
+      item =>
+        item.song
+    )
 }
 
 
@@ -191,6 +251,24 @@ function getPositionMultiplier(position) {
 }
 
 
+function formatTime(seconds) {
+
+  const mins =
+    Math.floor(
+      seconds / 60
+    )
+
+  const secs =
+    seconds % 60
+
+
+  return (
+    `${String(mins).padStart(2, '0')}:` +
+    `${String(secs).padStart(2, '0')}`
+  )
+}
+
+
 export default function RoomGamePage() {
 
   const { code } =
@@ -201,9 +279,9 @@ export default function RoomGamePage() {
 
 
   /*
-  ==========================================
-  DATOS DE SALA
-  ==========================================
+  =====================================
+  SALA
+  =====================================
   */
 
   const [room, setRoom] =
@@ -215,6 +293,9 @@ export default function RoomGamePage() {
   const [players, setPlayers] =
     useState([])
 
+  const [songs, setSongs] =
+    useState([])
+
   const [song, setSong] =
     useState(null)
 
@@ -223,9 +304,9 @@ export default function RoomGamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   RONDA
-  ==========================================
+  =====================================
   */
 
   const [levelIndex, setLevelIndex] =
@@ -250,9 +331,9 @@ export default function RoomGamePage() {
 
 
   /*
-  ==========================================
-  TEMPORIZADOR
-  ==========================================
+  =====================================
+  TIMER
+  =====================================
   */
 
   const [timeLeft, setTimeLeft] =
@@ -274,9 +355,9 @@ export default function RoomGamePage() {
 
 
   /*
-  ==========================================
-  BUSCADOR
-  ==========================================
+  =====================================
+  BUSCADOR LOCAL
+  =====================================
   */
 
   const [query, setQuery] =
@@ -303,9 +384,9 @@ export default function RoomGamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   SPOTIFY
-  ==========================================
+  =====================================
   */
 
   const iframeApiRef =
@@ -314,16 +395,10 @@ export default function RoomGamePage() {
   const controllerRef =
     useRef(null)
 
-  const loadedSpotifyIdRef =
-    useRef(null)
-
-  const fallbackTimerRef =
-    useRef(null)
+  const hasPlayedCurrentSongRef =
+    useRef(false)
 
   const targetDurationRef =
-    useRef(null)
-
-  const startedPositionRef =
     useRef(null)
 
   const playingRequestRef =
@@ -332,17 +407,14 @@ export default function RoomGamePage() {
   const stoppingRef =
     useRef(false)
 
-    const playbackClockRef =
-  useRef(null)
+  const playbackWatchdogRef =
+    useRef(null)
 
-const playbackWatchdogRef =
-  useRef(null)
+  const playbackStartedAtRef =
+    useRef(null)
 
-const playbackStartedAtRef =
-  useRef(null)
-
-  const hasPlayedCurrentSongRef =
-    useRef(false)
+  const fallbackTimerRef =
+    useRef(null)
 
 
   const [spotifyReady, setSpotifyReady] =
@@ -356,9 +428,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   MENSAJES
-  ==========================================
+  =====================================
   */
 
   const [message, setMessage] =
@@ -379,9 +451,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  CARGA INICIAL
-  ==========================================
+  =====================================
+  INICIO
+  =====================================
   */
 
   useEffect(() => {
@@ -417,22 +489,12 @@ const playbackStartedAtRef =
 
       controllerRef.current
         ?.destroy?.()
-
-
-      controllerRef.current =
-        null
     }
 
   }, [
     code
   ])
 
-
-  /*
-  ==========================================
-  DATOS INICIALES
-  ==========================================
-  */
 
   async function loadInitial() {
 
@@ -498,9 +560,12 @@ const playbackStartedAtRef =
         roomData.id
       ),
 
+      loadSongs(),
+
       loadAnswers(
         roomData.id,
-        roomData.current_round
+        roomData.current_round,
+        playerSession.player_id
       )
 
     ])
@@ -515,12 +580,6 @@ const playbackStartedAtRef =
       )
     }
 
-
-    /*
-    Si esta es la primera ronda y todavía
-    no existe fecha de inicio, el host
-    crea una preparación de 3 segundos.
-    */
 
     if (
       playerSession.is_host &&
@@ -537,9 +596,52 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  PREPARAR INICIO DE RONDA
-  ==========================================
+  =====================================
+  BIBLIOTECA LOCAL
+  =====================================
+  */
+
+  async function loadSongs() {
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from('songs')
+        .select(
+          'id, title, artist, spotify_id, album_image_url'
+        )
+        .eq(
+          'active',
+          true
+        )
+
+
+    if (error) {
+
+      console.error(error)
+
+      return
+    }
+
+
+    setSongs(
+      (data || [])
+        .filter(
+          item =>
+            Boolean(
+              item.spotify_id
+            )
+        )
+    )
+  }
+
+
+  /*
+  =====================================
+  INICIO SINCRONIZADO
+  =====================================
   */
 
   async function setRoundStart(
@@ -569,9 +671,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   REALTIME
-  ==========================================
+  =====================================
   */
 
   useEffect(() => {
@@ -650,7 +752,8 @@ const playbackStartedAtRef =
 
               await loadAnswers(
                 updated.id,
-                updated.current_round
+                updated.current_round,
+                player?.player_id
               )
             }
           }
@@ -686,7 +789,8 @@ const playbackStartedAtRef =
 
             loadAnswers(
               room.id,
-              room.current_round
+              room.current_round,
+              player?.player_id
             )
 
             loadPlayers(
@@ -708,14 +812,15 @@ const playbackStartedAtRef =
   }, [
     room?.id,
     room?.current_round,
-    room?.current_song_id
+    room?.current_song_id,
+    player?.player_id
   ])
 
 
   /*
-  ==========================================
-  TIMER SINCRONIZADO
-  ==========================================
+  =====================================
+  TIMER
+  =====================================
   */
 
   useEffect(() => {
@@ -724,7 +829,6 @@ const playbackStartedAtRef =
       !room?.round_started_at ||
       room.status !== 'playing'
     ) {
-
       return
     }
 
@@ -746,10 +850,6 @@ const playbackStartedAtRef =
           const msUntilStart =
             start - now
 
-
-          /*
-          Preparando ronda
-          */
 
           if (
             msUntilStart > 0
@@ -779,10 +879,6 @@ const playbackStartedAtRef =
           }
 
 
-          /*
-          Ronda activa
-          */
-
           setPreparationLeft(0)
 
           setRoundActive(true)
@@ -810,10 +906,6 @@ const playbackStartedAtRef =
             remaining
           )
 
-
-          /*
-          Tiempo terminado
-          */
 
           if (
             remaining <= 0
@@ -861,9 +953,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  CARGAR JUGADORES
-  ==========================================
+  =====================================
+  DATOS
+  =====================================
   */
 
   async function loadPlayers(roomId) {
@@ -881,8 +973,7 @@ const playbackStartedAtRef =
         .order(
           'score',
           {
-            ascending:
-              false
+            ascending: false
           }
         )
 
@@ -893,15 +984,10 @@ const playbackStartedAtRef =
   }
 
 
-  /*
-  ==========================================
-  CARGAR RESPUESTAS
-  ==========================================
-  */
-
   async function loadAnswers(
     roomId,
-    roundNumber
+    roundNumber,
+    currentPlayerId = null
   ) {
 
     if (!roundNumber) {
@@ -934,22 +1020,23 @@ const playbackStartedAtRef =
         )
 
 
-    setAnswers(
+    const list =
       data || []
-    )
+
+
+    setAnswers(list)
 
 
     if (
-      player?.player_id
+      currentPlayerId
     ) {
 
       const ownAnswer =
-        (data || [])
-          .find(
-            item =>
-              item.player_id ===
-              player.player_id
-          )
+        list.find(
+          item =>
+            item.player_id ===
+            currentPlayerId
+        )
 
 
       if (ownAnswer) {
@@ -959,16 +1046,33 @@ const playbackStartedAtRef =
         setRoundPoints(
           ownAnswer.points || 0
         )
+
+
+        if (
+          ownAnswer.correct
+        ) {
+
+          const correctBefore =
+            list.filter(
+              item =>
+                item.correct &&
+                new Date(
+                  item.created_at
+                ) <=
+                new Date(
+                  ownAnswer.created_at
+                )
+            )
+
+
+          setCorrectPosition(
+            correctBefore.length
+          )
+        }
       }
     }
   }
 
-
-  /*
-  ==========================================
-  CARGAR CANCIÓN
-  ==========================================
-  */
 
   async function loadSong(songId) {
 
@@ -1011,9 +1115,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   SPOTIFY
-  ==========================================
+  =====================================
   */
 
   async function prepareSpotifySong(
@@ -1034,28 +1138,19 @@ const playbackStartedAtRef =
       IFrameAPI
 
 
+    hasPlayedCurrentSongRef.current =
+      false
+
+
     if (
       controllerRef.current
     ) {
-
-      loadedSpotifyIdRef.current =
-        spotifyId
-
-
-      hasPlayedCurrentSongRef.current =
-        false
-
 
       controllerRef.current
         .loadEntity(
           `spotify:track:${spotifyId}`
         )
 
-
-      /*
-      Dejamos que Spotify cargue durante
-      los 3 segundos de preparación.
-      */
 
       setSpotifyReady(true)
 
@@ -1089,10 +1184,6 @@ const playbackStartedAtRef =
           controller
 
 
-        loadedSpotifyIdRef.current =
-          spotifyId
-
-
         setupSpotifyEvents(
           controller
         )
@@ -1115,273 +1206,188 @@ const playbackStartedAtRef =
 
 
     controller.addListener(
-  'playback_started',
-  () => {
+      'playback_started',
+      () => {
 
-    if (
-      !playingRequestRef.current
-    ) {
-      return
-    }
-
-
-    /*
-    Spotify YA empezó a sonar.
-
-    Aquí empieza nuestro reloj real.
-    */
-
-    playbackStartedAtRef.current =
-      performance.now()
+        if (
+          !playingRequestRef.current
+        ) {
+          return
+        }
 
 
-    setAudioStarting(false)
+        playbackStartedAtRef.current =
+          performance.now()
 
-    setIsPlaying(true)
+
+        setAudioStarting(false)
+
+        setIsPlaying(true)
 
 
-    clearTimeout(
-      fallbackTimerRef.current
+        clearInterval(
+          playbackWatchdogRef.current
+        )
+
+        clearTimeout(
+          fallbackTimerRef.current
+        )
+
+
+        playbackWatchdogRef.current =
+          setInterval(
+            () => {
+
+              if (
+                !playingRequestRef.current ||
+                playbackStartedAtRef.current ===
+                  null ||
+                targetDurationRef.current ===
+                  null
+              ) {
+                return
+              }
+
+
+              const elapsed =
+                performance.now() -
+                playbackStartedAtRef.current
+
+
+              if (
+                elapsed >=
+                targetDurationRef.current
+              ) {
+
+                forceStopSpotify()
+              }
+
+            },
+            50
+          )
+
+
+        fallbackTimerRef.current =
+          setTimeout(
+            () => {
+
+              forceStopSpotify()
+
+            },
+            (
+              targetDurationRef.current ||
+              1000
+            ) + 350
+          )
+      }
     )
-
-    clearInterval(
-      playbackWatchdogRef.current
-    )
-
-
-    /*
-    WATCHDOG
-
-    Revisamos nuestro propio reloj
-    cada 50 ms.
-
-    Ya no dependemos de la posición
-    que reporte Spotify.
-    */
-
-    playbackWatchdogRef.current =
-      setInterval(
-        () => {
-
-          if (
-            !playingRequestRef.current ||
-            playbackStartedAtRef.current ===
-              null ||
-            targetDurationRef.current ===
-              null
-          ) {
-
-            return
-          }
-
-
-          const elapsed =
-            performance.now() -
-            playbackStartedAtRef.current
-
-
-          if (
-            elapsed >=
-            targetDurationRef.current
-          ) {
-
-            forceStopSpotify()
-          }
-
-        },
-        50
-      )
-
-
-    /*
-    Segundo seguro de emergencia.
-
-    Si por alguna razón el interval
-    falla, cortamos igualmente.
-    */
-
-    fallbackTimerRef.current =
-      setTimeout(
-        () => {
-
-          forceStopSpotify()
-
-        },
-        (
-          targetDurationRef.current ||
-          1000
-        ) + 300
-      )
-  }
-)
-
-
-    controller.addListener(
-  'playback_update',
-  event => {
-
-    const data =
-      event?.data
-
-
-    if (!data) {
-      return
-    }
-
-
-    /*
-    Ya NO usamos position para medir
-    cuánto debe durar el fragmento.
-
-    Solo detectamos si Spotify
-    realmente quedó pausado.
-    */
-
-    if (
-      data.isPaused &&
-      !audioStarting &&
-      playingRequestRef.current
-    ) {
-
-      setIsPlaying(false)
-    }
-  }
-)
   }
 
 
   function forceStopSpotify() {
 
-  if (
-    stoppingRef.current
-  ) {
-    return
+    if (
+      stoppingRef.current
+    ) {
+      return
+    }
+
+
+    stoppingRef.current =
+      true
+
+
+    clearInterval(
+      playbackWatchdogRef.current
+    )
+
+    clearTimeout(
+      fallbackTimerRef.current
+    )
+
+
+    playbackStartedAtRef.current =
+      null
+
+    playingRequestRef.current =
+      false
+
+    targetDurationRef.current =
+      null
+
+
+    const controller =
+      controllerRef.current
+
+
+    controller?.pause()
+
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      80
+    )
+
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      220
+    )
+
+
+    setAudioStarting(false)
+
+    setIsPlaying(false)
+
+
+    setTimeout(
+      () => {
+
+        stoppingRef.current =
+          false
+
+      },
+      300
+    )
   }
 
 
-  stoppingRef.current =
-    true
+  function stopSpotify() {
+
+    clearInterval(
+      playbackWatchdogRef.current
+    )
+
+    clearTimeout(
+      fallbackTimerRef.current
+    )
 
 
-  clearTimeout(
-    fallbackTimerRef.current
-  )
+    playbackStartedAtRef.current =
+      null
 
-  clearInterval(
-    playbackWatchdogRef.current
-  )
+    playingRequestRef.current =
+      false
 
+    targetDurationRef.current =
+      null
 
-  playbackStartedAtRef.current =
-    null
-
-  playingRequestRef.current =
-    false
-
-  targetDurationRef.current =
-    null
-
-  startedPositionRef.current =
-    null
+    stoppingRef.current =
+      false
 
 
-  const controller =
     controllerRef.current
+      ?.pause()
 
 
-  /*
-  Pausa inmediata.
-  */
+    setAudioStarting(false)
 
-  controller?.pause()
-
-
-  /*
-  Spotify a veces tarda en aceptar
-  el pause.
-
-  Repetimos la orden como seguridad.
-  */
-
-  setTimeout(
-    () => {
-      controller?.pause()
-    },
-    80
-  )
-
-
-  setTimeout(
-    () => {
-      controller?.pause()
-    },
-    220
-  )
-
-
-  setAudioStarting(false)
-
-  setIsPlaying(false)
-
-
-  setTimeout(
-    () => {
-
-      stoppingRef.current =
-        false
-
-    },
-    300
-  )
-}
-
-
-   function stopSpotify() {
-
-  clearTimeout(
-    fallbackTimerRef.current
-  )
-
-  clearInterval(
-    playbackWatchdogRef.current
-  )
-
-
-  playbackStartedAtRef.current =
-    null
-
-  playingRequestRef.current =
-    false
-
-  targetDurationRef.current =
-    null
-
-  startedPositionRef.current =
-    null
-
-  stoppingRef.current =
-    false
-
-
-  const controller =
-    controllerRef.current
-
-
-  controller?.pause()
-
-
-  setTimeout(
-    () => {
-      controller?.pause()
-    },
-    80
-  )
-
-
-  setAudioStarting(false)
-
-  setIsPlaying(false)
-} 
+    setIsPlaying(false)
+  }
 
 
   function togglePlay() {
@@ -1411,19 +1417,23 @@ const playbackStartedAtRef =
     }
 
 
+    clearInterval(
+      playbackWatchdogRef.current
+    )
+
     clearTimeout(
       fallbackTimerRef.current
     )
 
+
+    playbackStartedAtRef.current =
+      null
 
     playingRequestRef.current =
       true
 
     stoppingRef.current =
       false
-
-    startedPositionRef.current =
-      null
 
 
     targetDurationRef.current =
@@ -1435,12 +1445,6 @@ const playbackStartedAtRef =
 
     setIsPlaying(true)
 
-
-    /*
-    Primera reproducción:
-    ya estaba precargada durante
-    el countdown, así que solo play().
-    */
 
     if (
       hasPlayedCurrentSongRef.current
@@ -1461,9 +1465,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  BUSCADOR
-  ==========================================
+  =====================================
+  BUSCADOR LOCAL
+  =====================================
   */
 
   useEffect(() => {
@@ -1492,20 +1496,34 @@ const playbackStartedAtRef =
 
       setSearchResults([])
 
+      setSearching(false)
+
       return
     }
+
+
+    setSearching(true)
 
 
     searchTimer.current =
       setTimeout(
         () => {
 
-          searchSongs(
-            query.trim()
+          const results =
+            searchLibrary(
+              songs,
+              query.trim()
+            )
+
+
+          setSearchResults(
+            results
           )
 
+          setSearching(false)
+
         },
-        300
+        90
       )
 
 
@@ -1519,56 +1537,9 @@ const playbackStartedAtRef =
   }, [
     query,
     roundDone,
-    roundActive
+    roundActive,
+    songs
   ])
-
-
-  async function searchSongs(search) {
-
-    setSearching(true)
-
-
-    try {
-
-      const {
-        data,
-        error
-      } =
-        await supabase
-          .functions
-          .invoke(
-            'spotify-search',
-            {
-              body: {
-                query: search
-              }
-            }
-          )
-
-
-      if (error) {
-        throw error
-      }
-
-
-      setSearchResults(
-        dedupeTracks(
-          data?.tracks || []
-        )
-      )
-
-
-    } catch (error) {
-
-      console.error(error)
-
-      setSearchResults([])
-
-    } finally {
-
-      setSearching(false)
-    }
-  }
 
 
   function selectGuess(track) {
@@ -1592,9 +1563,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   FALLO / SALTO
-  ==========================================
+  =====================================
   */
 
   function registerFailure(
@@ -1609,12 +1580,9 @@ const playbackStartedAtRef =
     }
 
 
-    const newWrongCount =
-      wrongCount + 1
-
-
     setWrongCount(
-      newWrongCount
+      current =>
+        current + 1
     )
 
 
@@ -1644,11 +1612,6 @@ const playbackStartedAtRef =
     setSearchResults([])
 
 
-    /*
-    Si todavía hay otro nivel,
-    avanzamos.
-    */
-
     if (
       levelIndex <
       LEVELS.length - 1
@@ -1658,20 +1621,8 @@ const playbackStartedAtRef =
         current =>
           current + 1
       )
-
-      setMessage(
-        `−${PENALTY_PER_MISTAKE} pts potenciales`
-      )
-
-      return
     }
 
-
-    /*
-    Ya llegó al último nivel.
-    Puede seguir intentando durante
-    el minuto, pero permanece en 15s.
-    */
 
     setMessage(
       `−${PENALTY_PER_MISTAKE} pts potenciales`
@@ -1688,9 +1639,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   ADIVINAR
-  ==========================================
+  =====================================
   */
 
   function guess() {
@@ -1759,9 +1710,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  FINALIZAR RESPUESTA DEL JUGADOR
-  ==========================================
+  =====================================
+  TERMINAR RONDA
+  =====================================
   */
 
   async function finishRound(
@@ -1884,7 +1835,8 @@ const playbackStartedAtRef =
 
         loadAnswers(
           room.id,
-          room.current_round
+          room.current_round,
+          player.player_id
         ),
 
         loadPlayers(
@@ -1907,9 +1859,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  RESET DE RONDA
-  ==========================================
+  =====================================
+  RESET
+  =====================================
   */
 
   function resetRound() {
@@ -1962,9 +1914,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   SIGUIENTE RONDA
-  ==========================================
+  =====================================
   */
 
   async function nextRound() {
@@ -1978,10 +1930,6 @@ const playbackStartedAtRef =
 
     stopSpotify()
 
-
-    /*
-    Terminar partida.
-    */
 
     if (
       room.current_round >=
@@ -2010,43 +1958,13 @@ const playbackStartedAtRef =
     }
 
 
-    /*
-    Buscar una canción nueva.
-    */
-
-    const {
-      data: availableSongs,
-      error
-    } =
-      await supabase
-        .from('songs')
-        .select(
-          'id, spotify_id'
-        )
-        .eq(
-          'active',
-          true
-        )
-
-
-    if (error) {
-
-      setMessage(
-        error.message
-      )
-
-      return
-    }
-
-
     const usable =
-      (availableSongs || [])
-        .filter(
-          item =>
-            Boolean(
-              item.spotify_id
-            )
-        )
+      songs.filter(
+        item =>
+          Boolean(
+            item.spotify_id
+          )
+      )
 
 
     if (!usable.length) {
@@ -2083,12 +2001,6 @@ const playbackStartedAtRef =
       ]
 
 
-    /*
-    Los 3 segundos sirven para que
-    cada navegador reciba la canción
-    y Spotify la vaya preparando.
-    */
-
     const startAt =
       new Date(
         Date.now() +
@@ -2099,7 +2011,7 @@ const playbackStartedAtRef =
 
 
     const {
-      error: updateError
+      error
     } =
       await supabase
         .from('rooms')
@@ -2121,19 +2033,19 @@ const playbackStartedAtRef =
         )
 
 
-    if (updateError) {
+    if (error) {
 
       setMessage(
-        updateError.message
+        error.message
       )
     }
   }
 
 
   /*
-  ==========================================
-  DATOS DE RANKING DE RONDA
-  ==========================================
+  =====================================
+  DERIVADOS
+  =====================================
   */
 
   const correctAnswers =
@@ -2166,9 +2078,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
-  PANTALLA FINAL
-  ==========================================
+  =====================================
+  FINAL
+  =====================================
   */
 
   if (
@@ -2265,9 +2177,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   CARGANDO
-  ==========================================
+  =====================================
   */
 
   if (
@@ -2293,9 +2205,9 @@ const playbackStartedAtRef =
 
 
   /*
-  ==========================================
+  =====================================
   UI
-  ==========================================
+  =====================================
   */
 
   return (
@@ -2311,8 +2223,6 @@ const playbackStartedAtRef =
 
       </div>
 
-
-      {/* CABECERA */}
 
       <div className="room-game-top">
 
@@ -2356,8 +2266,6 @@ const playbackStartedAtRef =
       </div>
 
 
-      {/* TIMER */}
-
       <div
         className={
           `room-round-timer ${
@@ -2383,24 +2291,14 @@ const playbackStartedAtRef =
 
         ) : (
 
-          <>
-
-            00:
-            {String(
-              timeLeft
-            ).padStart(
-              2,
-              '0'
-            )}
-
-          </>
+          formatTime(
+            timeLeft
+          )
 
         )}
 
       </div>
 
-
-      {/* PREPARACIÓN */}
 
       {preparationLeft > 0 &&
         !roundDone && (
@@ -2424,8 +2322,6 @@ const playbackStartedAtRef =
 
       )}
 
-
-      {/* JUEGO ACTIVO */}
 
       {!roundDone &&
         preparationLeft === 0 && (
@@ -2527,8 +2423,6 @@ const playbackStartedAtRef =
           </div>
 
 
-          {/* PLAY */}
-
           <button
             className={
               `play-button ${
@@ -2537,9 +2431,7 @@ const playbackStartedAtRef =
                   : ''
               }`
             }
-            onClick={
-              togglePlay
-            }
+            onClick={togglePlay}
             disabled={
               !spotifyReady ||
               !roundActive
@@ -2573,8 +2465,6 @@ const playbackStartedAtRef =
 
           </div>
 
-
-          {/* BUSCADOR */}
 
           <div className="guess-area">
 
@@ -2627,9 +2517,7 @@ const playbackStartedAtRef =
 
                       <button
                         type="button"
-                        key={
-                          track.spotify_id
-                        }
+                        key={track.id}
                         onClick={
                           () =>
                             selectGuess(
@@ -2719,8 +2607,6 @@ const playbackStartedAtRef =
           )}
 
 
-          {/* INTENTOS */}
-
           {attempts.length > 0 && (
 
             <div className="attempt-history">
@@ -2778,8 +2664,6 @@ const playbackStartedAtRef =
 
       )}
 
-
-      {/* TERMINÓ TU RONDA */}
 
       {roundDone && (
 
@@ -2900,9 +2784,7 @@ const playbackStartedAtRef =
               disabled={
                 !hostCanContinue
               }
-              onClick={
-                nextRound
-              }
+              onClick={nextRound}
             >
 
               <ArrowRight />
@@ -2938,8 +2820,6 @@ const playbackStartedAtRef =
 
       )}
 
-
-      {/* QUIÉNES ACERTARON */}
 
       <div className="room-correct-list">
 
@@ -3015,8 +2895,6 @@ const playbackStartedAtRef =
 
       </div>
 
-
-      {/* MARCADOR GLOBAL */}
 
       <div className="live-scoreboard">
 

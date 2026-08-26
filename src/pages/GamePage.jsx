@@ -59,7 +59,6 @@ const LEVELS = [
 
 
 function normalizeText(value = '') {
-
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -77,7 +76,6 @@ function normalizeText(value = '') {
 
 
 function normalizeArtist(value = '') {
-
   return normalizeText(value)
     .replace(/\bfeat\b.*$/g, '')
     .replace(/\bft\b.*$/g, '')
@@ -95,10 +93,8 @@ function sameSong(song, guess) {
   if (
     song.spotify_id &&
     guess.spotify_id &&
-    song.spotify_id ===
-      guess.spotify_id
+    song.spotify_id === guess.spotify_id
   ) {
-
     return true
   }
 
@@ -131,30 +127,94 @@ function sameSong(song, guess) {
 }
 
 
-function dedupeTracks(tracks = []) {
+function searchLibrary(
+  library,
+  search
+) {
 
-  const map =
-    new Map()
-
-
-  for (const track of tracks) {
-
-    const key =
-      `${normalizeText(track.title)}::${normalizeArtist(track.artist)}`
+  const needle =
+    normalizeText(search)
 
 
-    if (!map.has(key)) {
-
-      map.set(
-        key,
-        track
-      )
-    }
+  if (!needle) {
+    return []
   }
 
 
-  return Array.from(
-    map.values()
+  /*
+  Primero priorizamos coincidencias
+  que empiezan con lo escrito.
+  */
+
+  const ranked =
+    library
+      .map(song => {
+
+        const title =
+          normalizeText(song.title)
+
+        const artist =
+          normalizeText(song.artist)
+
+        const combined =
+          `${title} ${artist}`
+
+
+        let score = 0
+
+
+        if (title === needle) {
+          score = 100
+
+        } else if (
+          title.startsWith(needle)
+        ) {
+          score = 90
+
+        } else if (
+          artist.startsWith(needle)
+        ) {
+          score = 80
+
+        } else if (
+          title.includes(needle)
+        ) {
+          score = 70
+
+        } else if (
+          artist.includes(needle)
+        ) {
+          score = 60
+
+        } else if (
+          combined.includes(needle)
+        ) {
+          score = 50
+        }
+
+
+        return {
+          song,
+          score
+        }
+      })
+      .filter(
+        item =>
+          item.score > 0
+      )
+      .sort(
+        (a, b) =>
+          b.score - a.score
+      )
+      .slice(
+        0,
+        8
+      )
+
+
+  return ranked.map(
+    item =>
+      item.song
   )
 }
 
@@ -162,9 +222,9 @@ function dedupeTracks(tracks = []) {
 export default function GamePage() {
 
   /*
-  ==========================================
+  =====================================
   JUEGO
-  ==========================================
+  =====================================
   */
 
   const [songs, setSongs] =
@@ -191,26 +251,22 @@ export default function GamePage() {
   const [loading, setLoading] =
     useState(true)
 
+
+  /*
+  =====================================
+  SPOTIFY
+  =====================================
+  */
+
+  const [spotifyReady, setSpotifyReady] =
+    useState(false)
+
   const [isPlaying, setIsPlaying] =
     useState(false)
 
   const [audioStarting, setAudioStarting] =
     useState(false)
 
-  const [spotifyReady, setSpotifyReady] =
-    useState(false)
-
-
-  /*
-  ==========================================
-  DOBLE SPOTIFY CONTROLLER
-  ==========================================
-
-  A = canción actual
-  B = próxima canción
-
-  Luego se intercambian.
-  */
 
   const iframeApiRef =
     useRef(null)
@@ -244,31 +300,34 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
-  CONTROL DE TIEMPO
-  ==========================================
+  =====================================
+  CONTROL DE AUDIO
+  =====================================
   */
-
-  const fallbackTimerRef =
-    useRef(null)
 
   const targetDurationRef =
     useRef(null)
 
-  const startedPositionRef =
-    useRef(null)
+  const playingRequestRef =
+    useRef(false)
 
   const stoppingRef =
     useRef(false)
 
-  const playingRequestRef =
-    useRef(false)
+  const playbackWatchdogRef =
+    useRef(null)
+
+  const playbackStartedAtRef =
+    useRef(null)
+
+  const fallbackTimerRef =
+    useRef(null)
 
 
   /*
-  ==========================================
-  BUSCADOR
-  ==========================================
+  =====================================
+  BUSCADOR LOCAL
+  =====================================
   */
 
   const [query, setQuery] =
@@ -297,9 +356,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   RESULTADOS
-  ==========================================
+  =====================================
   */
 
   const [attempts, setAttempts] =
@@ -324,9 +383,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
-  HELPERS CONTROLLERS
-  ==========================================
+  =====================================
+  HELPERS SPOTIFY
+  =====================================
   */
 
   function getActiveController() {
@@ -334,14 +393,6 @@ export default function GamePage() {
     return activeSlotRef.current === 'A'
       ? controllerARef.current
       : controllerBRef.current
-  }
-
-
-  function getStandbyController() {
-
-    return activeSlotRef.current === 'A'
-      ? controllerBRef.current
-      : controllerARef.current
   }
 
 
@@ -379,9 +430,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   INICIO
-  ==========================================
+  =====================================
   */
 
   useEffect(() => {
@@ -399,10 +450,7 @@ export default function GamePage() {
       })
       .catch(error => {
 
-        console.error(
-          'Spotify API:',
-          error
-        )
+        console.error(error)
 
         setMessage(
           'No se pudo preparar el reproductor.'
@@ -424,22 +472,159 @@ export default function GamePage() {
 
       controllerBRef.current
         ?.destroy?.()
-
-
-      controllerARef.current =
-        null
-
-      controllerBRef.current =
-        null
     }
 
   }, [])
 
 
   /*
-  ==========================================
-  CREAR CONTROLLERS
-  ==========================================
+  =====================================
+  CARGAR CANCIONES
+  =====================================
+  */
+
+  async function loadSongs() {
+
+    setLoading(true)
+
+
+    if (!supabaseReady) {
+
+      setLoading(false)
+
+      return
+    }
+
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from('songs')
+        .select(
+          'id, title, artist, spotify_id, album_image_url, album_name, year, genre'
+        )
+        .eq(
+          'active',
+          true
+        )
+
+
+    if (error) {
+
+      setMessage(
+        error.message
+      )
+
+      setLoading(false)
+
+      return
+    }
+
+
+    setSongs(
+      (data || [])
+        .filter(
+          item =>
+            Boolean(
+              item.spotify_id
+            )
+        )
+    )
+
+
+    setLoading(false)
+  }
+
+
+  /*
+  =====================================
+  PRIMERA CANCIÓN
+  =====================================
+  */
+
+  useEffect(() => {
+
+    if (
+      loading ||
+      !songs.length ||
+      song
+    ) {
+      return
+    }
+
+
+    const first =
+      chooseRandomSong([])
+
+
+    const second =
+      chooseRandomSong([
+        first?.id
+      ])
+
+
+    setSong(first)
+
+    setNextSong(second)
+
+
+    setTimeout(
+      () => {
+
+        ensureControllers(
+          first,
+          second
+        )
+
+      },
+      0
+    )
+
+  }, [
+    loading,
+    songs.length
+  ])
+
+
+  function chooseRandomSong(
+    excludeIds = []
+  ) {
+
+    const available =
+      songs.filter(
+        item =>
+          !excludeIds.includes(
+            item.id
+          )
+      )
+
+
+    const pool =
+      available.length
+        ? available
+        : songs
+
+
+    if (!pool.length) {
+      return null
+    }
+
+
+    return pool[
+      Math.floor(
+        Math.random() *
+        pool.length
+      )
+    ]
+  }
+
+
+  /*
+  =====================================
+  CREAR DOBLE CONTROLLER
+  =====================================
   */
 
   async function ensureControllers(
@@ -463,10 +648,6 @@ export default function GamePage() {
       IFrameAPI
 
 
-    /*
-    CONTROLLER A
-    */
-
     if (
       !controllerARef.current
     ) {
@@ -484,7 +665,6 @@ export default function GamePage() {
           {
             width: '100%',
             height: 80,
-
             uri:
               `spotify:track:${current.spotify_id}`
           },
@@ -510,10 +690,6 @@ export default function GamePage() {
     }
 
 
-    /*
-    CONTROLLER B
-    */
-
     if (
       upcoming?.spotify_id &&
       !controllerBRef.current
@@ -532,7 +708,6 @@ export default function GamePage() {
           {
             width: '100%',
             height: 80,
-
             uri:
               `spotify:track:${upcoming.spotify_id}`
           },
@@ -595,11 +770,6 @@ export default function GamePage() {
       'playback_started',
       () => {
 
-        /*
-        Ignorar eventos del reproductor
-        que está precargando.
-        */
-
         if (
           slot !==
           activeSlotRef.current
@@ -615,14 +785,55 @@ export default function GamePage() {
         }
 
 
+        playbackStartedAtRef.current =
+          performance.now()
+
+
         setAudioStarting(false)
 
         setIsPlaying(true)
 
 
+        clearInterval(
+          playbackWatchdogRef.current
+        )
+
         clearTimeout(
           fallbackTimerRef.current
         )
+
+
+        playbackWatchdogRef.current =
+          setInterval(
+            () => {
+
+              if (
+                !playingRequestRef.current ||
+                playbackStartedAtRef.current ===
+                  null ||
+                targetDurationRef.current ===
+                  null
+              ) {
+                return
+              }
+
+
+              const elapsed =
+                performance.now() -
+                playbackStartedAtRef.current
+
+
+              if (
+                elapsed >=
+                targetDurationRef.current
+              ) {
+
+                forceStopSpotify()
+              }
+
+            },
+            50
+          )
 
 
         fallbackTimerRef.current =
@@ -635,86 +846,12 @@ export default function GamePage() {
             (
               targetDurationRef.current ||
               1000
-            ) + 1200
+            ) + 350
           )
-      }
-    )
-
-
-    controller.addListener(
-      'playback_update',
-      event => {
-
-        if (
-          slot !==
-          activeSlotRef.current
-        ) {
-          return
-        }
-
-
-        const data =
-          event?.data
-
-
-        if (!data) {
-          return
-        }
-
-
-        const position =
-          Number(
-            data.position || 0
-          )
-
-
-        if (
-          playingRequestRef.current &&
-          startedPositionRef.current ===
-            null &&
-          !data.isPaused &&
-          !data.isBuffering
-        ) {
-
-          startedPositionRef.current =
-            position
-        }
-
-
-        if (
-          !playingRequestRef.current ||
-          targetDurationRef.current ===
-            null ||
-          startedPositionRef.current ===
-            null ||
-          stoppingRef.current
-        ) {
-          return
-        }
-
-
-        const played =
-          position -
-          startedPositionRef.current
-
-
-        if (
-          played >=
-          targetDurationRef.current
-        ) {
-
-          forceStopSpotify()
-        }
       }
     )
   }
 
-
-  /*
-  ==========================================
-  PRECARGAR EN SLOT
-  ==========================================
-  */
 
   function preloadSongIntoSlot(
     slot,
@@ -781,9 +918,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   AUDIO
-  ==========================================
+  =====================================
   */
 
   function forceStopSpotify() {
@@ -799,14 +936,17 @@ export default function GamePage() {
       true
 
 
+    clearInterval(
+      playbackWatchdogRef.current
+    )
+
     clearTimeout(
       fallbackTimerRef.current
     )
 
 
-    getActiveController()
-      ?.pause()
-
+    playbackStartedAtRef.current =
+      null
 
     playingRequestRef.current =
       false
@@ -814,8 +954,28 @@ export default function GamePage() {
     targetDurationRef.current =
       null
 
-    startedPositionRef.current =
-      null
+
+    const controller =
+      getActiveController()
+
+
+    controller?.pause()
+
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      80
+    )
+
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      220
+    )
 
 
     setAudioStarting(false)
@@ -830,25 +990,29 @@ export default function GamePage() {
           false
 
       },
-      200
+      300
     )
   }
 
 
   function stopSpotify() {
 
+    clearInterval(
+      playbackWatchdogRef.current
+    )
+
     clearTimeout(
       fallbackTimerRef.current
     )
 
 
+    playbackStartedAtRef.current =
+      null
+
     playingRequestRef.current =
       false
 
     targetDurationRef.current =
-      null
-
-    startedPositionRef.current =
       null
 
     stoppingRef.current =
@@ -879,15 +1043,9 @@ export default function GamePage() {
       !spotifyReady ||
       status !== 'playing'
     ) {
-
       return
     }
 
-
-    /*
-    Si ya está arrancando o sonando,
-    el clic significa PAUSA.
-    */
 
     if (
       audioStarting ||
@@ -900,6 +1058,10 @@ export default function GamePage() {
     }
 
 
+    clearInterval(
+      playbackWatchdogRef.current
+    )
+
     clearTimeout(
       fallbackTimerRef.current
     )
@@ -908,11 +1070,12 @@ export default function GamePage() {
     stoppingRef.current =
       false
 
-    startedPositionRef.current =
+    playbackStartedAtRef.current =
       null
 
     playingRequestRef.current =
       true
+
 
     targetDurationRef.current =
       currentLevel.duration *
@@ -923,16 +1086,6 @@ export default function GamePage() {
 
     setIsPlaying(true)
 
-
-    /*
-    CLAVE:
-
-    Primera reproducción de una canción
-    precargada = solo play().
-
-    Si ya se escuchó antes,
-    reiniciamos el fragmento.
-    */
 
     if (
       activeAlreadyPlayed()
@@ -951,173 +1104,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
-  BIBLIOTECA
-  ==========================================
-  */
-
-  async function loadSongs() {
-
-    setLoading(true)
-
-
-    if (!supabaseReady) {
-
-      setLoading(false)
-
-      return
-    }
-
-
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from('songs')
-        .select('*')
-        .eq(
-          'active',
-          true
-        )
-
-
-    if (error) {
-
-      setMessage(
-        error.message
-      )
-
-
-    } else {
-
-      setSongs(
-        (data || [])
-          .filter(
-            item =>
-              Boolean(
-                item.spotify_id
-              )
-          )
-      )
-    }
-
-
-    setLoading(false)
-  }
-
-
-  /*
-  ==========================================
-  PRIMERA CANCIÓN
-  ==========================================
-  */
-
-  useEffect(() => {
-
-    if (
-      loading ||
-      !songs.length ||
-      song
-    ) {
-      return
-    }
-
-
-    const first =
-      songs[
-        Math.floor(
-          Math.random() *
-          songs.length
-        )
-      ]
-
-
-    const alternatives =
-      songs.filter(
-        item =>
-          item.id !==
-          first.id
-      )
-
-
-    const second =
-      alternatives.length
-        ? alternatives[
-            Math.floor(
-              Math.random() *
-              alternatives.length
-            )
-          ]
-        : first
-
-
-    setSong(first)
-
-    setNextSong(second)
-
-
-    setTimeout(
-      () => {
-
-        ensureControllers(
-          first,
-          second
-        )
-
-      },
-      0
-    )
-
-  }, [
-    loading,
-    songs.length
-  ])
-
-
-  /*
-  ==========================================
-  ELEGIR PRÓXIMA
-  ==========================================
-  */
-
-  function chooseRandomSong(
-    excludeIds = []
-  ) {
-
-    const available =
-      songs.filter(
-        item =>
-          !excludeIds.includes(
-            item.id
-          )
-      )
-
-
-    const pool =
-      available.length
-        ? available
-        : songs
-
-
-    if (!pool.length) {
-      return null
-    }
-
-
-    return pool[
-      Math.floor(
-        Math.random() *
-        pool.length
-      )
-    ]
-  }
-
-
-  /*
-  ==========================================
+  =====================================
   SIGUIENTE CANCIÓN
-  ==========================================
+  =====================================
   */
 
   function pickSong() {
@@ -1125,18 +1114,10 @@ export default function GamePage() {
     stopSpotify()
 
 
-    if (
-      !songs.length
-    ) {
+    if (!songs.length) {
       return
     }
 
-
-    /*
-    Si hay una precargada,
-    esa se convierte inmediatamente
-    en la canción actual.
-    */
 
     const incoming =
       nextSong ||
@@ -1150,20 +1131,11 @@ export default function GamePage() {
     }
 
 
-    /*
-    Intercambiamos reproductores.
-    */
-
     activeSlotRef.current =
       activeSlotRef.current === 'A'
         ? 'B'
         : 'A'
 
-
-    /*
-    El controller que antes estaba
-    precargando ahora es el activo.
-    */
 
     setSpotifyReady(
       activeIsReady() ||
@@ -1173,7 +1145,7 @@ export default function GamePage() {
     )
 
 
-    const newUpcoming =
+    const upcoming =
       chooseRandomSong([
         incoming.id,
         song?.id
@@ -1182,14 +1154,8 @@ export default function GamePage() {
 
     setSong(incoming)
 
-    setNextSong(
-      newUpcoming
-    )
+    setNextSong(upcoming)
 
-
-    /*
-    Reset de ronda.
-    */
 
     setLevelIndex(0)
 
@@ -1208,11 +1174,6 @@ export default function GamePage() {
     setScoreSaved(false)
 
 
-    /*
-    El reproductor que quedó libre
-    empieza a cargar la próxima canción.
-    */
-
     setTimeout(
       () => {
 
@@ -1224,7 +1185,7 @@ export default function GamePage() {
 
         preloadSongIntoSlot(
           standbySlot,
-          newUpcoming
+          upcoming
         )
 
       },
@@ -1234,9 +1195,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
-  BUSCADOR
-  ==========================================
+  =====================================
+  BUSCADOR LOCAL
+  =====================================
   */
 
   useEffect(() => {
@@ -1264,81 +1225,49 @@ export default function GamePage() {
 
       setSearchResults([])
 
+      setSearching(false)
+
       return
     }
+
+
+    setSearching(true)
 
 
     searchTimer.current =
       setTimeout(
         () => {
 
-          searchSongs(
-            query.trim()
+          const results =
+            searchLibrary(
+              songs,
+              query.trim()
+            )
+
+
+          setSearchResults(
+            results
           )
 
+          setSearching(false)
+
         },
-        350
+        90
       )
 
 
-    return () =>
+    return () => {
 
       clearTimeout(
         searchTimer.current
       )
+    }
 
   }, [
     query,
-    status
+    status,
+    songs
   ])
-
-
-  async function searchSongs(search) {
-
-    setSearching(true)
-
-
-    try {
-
-      const {
-        data,
-        error
-      } =
-        await supabase
-          .functions
-          .invoke(
-            'spotify-search',
-            {
-              body: {
-                query: search
-              }
-            }
-          )
-
-
-      if (error) {
-        throw error
-      }
-
-
-      setSearchResults(
-        dedupeTracks(
-          data?.tracks || []
-        )
-      )
-
-
-    } catch (error) {
-
-      console.error(error)
-
-      setSearchResults([])
-
-    } finally {
-
-      setSearching(false)
-    }
-  }
 
 
   function selectGuess(track) {
@@ -1360,9 +1289,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   JUEGO
-  ==========================================
+  =====================================
   */
 
   function advanceLevel() {
@@ -1538,9 +1467,9 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   RANKING
-  ==========================================
+  =====================================
   */
 
   async function loadLeaderboard() {
@@ -1641,22 +1570,15 @@ export default function GamePage() {
 
 
   /*
-  ==========================================
+  =====================================
   UI
-  ==========================================
+  =====================================
   */
 
   return (
 
     <section className="game-wrap">
 
-
-      {/*
-      DOS EMBEDS.
-
-      Uno reproduce la canción actual.
-      El otro tiene preparada la próxima.
-      */}
 
       <div className="spotify-hidden-player">
 
@@ -1689,9 +1611,7 @@ export default function GamePage() {
           ) => (
 
             <div
-              key={
-                level.id
-              }
+              key={level.id}
               className={
                 `level-pill ${level.id} ${
                   index === levelIndex
@@ -1760,9 +1680,7 @@ export default function GamePage() {
                   : ''
               }`
             }
-            onClick={
-              togglePlay
-            }
+            onClick={togglePlay}
             disabled={
               !spotifyReady ||
               status !== 'playing'
@@ -1848,9 +1766,7 @@ export default function GamePage() {
 
                       <button
                         type="button"
-                        key={
-                          track.spotify_id
-                        }
+                        key={track.id}
                         onClick={
                           () =>
                             selectGuess(
@@ -2106,9 +2022,7 @@ export default function GamePage() {
                   <button
                     className="primary"
                     onClick={saveScore}
-                    disabled={
-                      scoreSaved
-                    }
+                    disabled={scoreSaved}
                   >
 
                     {scoreSaved
