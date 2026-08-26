@@ -907,7 +907,7 @@ export default function AdminPage() {
       la Edge Function.
       */
 
-      await delay(180)
+      await delay(650)
     }
 
 
