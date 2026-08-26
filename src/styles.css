@@ -3358,3 +3358,352 @@ h2 {
 .skip-inline-btn.give-up {
   opacity: .9;
 }
+
+/* =====================================
+   GAME NORMAL - SIMPLE
+   ===================================== */
+
+.solo-game {
+  width: min(520px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 32px 0 60px;
+}
+
+.solo-loading {
+  padding: 80px 20px;
+  text-align: center;
+  color: rgba(255,255,255,.65);
+}
+
+.solo-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.solo-top span {
+  font-size: .82rem;
+  font-weight: 800;
+  color: rgba(255,255,255,.65);
+}
+
+
+/* niveles */
+
+.solo-levels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0,1fr));
+  gap: 5px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.solo-level {
+  min-width: 0;
+  padding: 8px 3px;
+  border-radius: 10px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.035);
+  opacity: .42;
+}
+
+.solo-level strong {
+  display: block;
+  overflow: hidden;
+  font-size: .68rem;
+  text-overflow: ellipsis;
+}
+
+.solo-level small {
+  display: block;
+  margin-top: 2px;
+  font-size: .62rem;
+  color: rgba(255,255,255,.45);
+}
+
+.solo-level.active {
+  opacity: 1;
+  border-color: #ff8a42;
+  background: rgba(255,138,66,.1);
+}
+
+.solo-level.used {
+  opacity: .22;
+}
+
+
+/* play */
+
+.solo-play {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+
+  display: grid;
+  place-items: center;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: #ff8a42;
+  color: #111;
+
+  cursor: pointer;
+}
+
+.solo-play:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.solo-duration {
+  margin: 9px 0 24px;
+  text-align: center;
+  font-size: .78rem;
+  color: rgba(255,255,255,.55);
+}
+
+
+/* buscar */
+
+.solo-controls {
+  position: relative;
+}
+
+.solo-search {
+  width: 100%;
+  height: 48px;
+
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+
+  padding: 0 14px;
+
+  background: rgba(255,255,255,.05);
+  color: #fff;
+
+  outline: none;
+  font-size: 16px;
+}
+
+.solo-search:focus {
+  border-color: #ff8a42;
+}
+
+.solo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.solo-actions button {
+  min-height: 44px;
+  justify-content: center;
+}
+
+
+/* intentos mínimos */
+
+.solo-attempts {
+  margin-top: 15px;
+  display: grid;
+  gap: 5px;
+}
+
+.solo-attempts > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px 9px;
+
+  font-size: .76rem;
+
+  color: rgba(255,255,255,.5);
+}
+
+.solo-attempts > div.correct {
+  color: #fff;
+}
+
+
+/* resultado */
+
+.solo-result {
+  width: 100%;
+  max-width: 420px;
+  margin: 30px auto 0;
+
+  text-align: center;
+}
+
+.solo-result img {
+  width: 130px;
+  height: 130px;
+
+  margin-bottom: 16px;
+
+  border-radius: 18px;
+
+  object-fit: cover;
+}
+
+.solo-result h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.solo-result p {
+  margin: 5px 0 12px;
+  color: rgba(255,255,255,.58);
+}
+
+.solo-result strong {
+  display: block;
+  margin-bottom: 14px;
+  color: #ff8a42;
+  font-size: 1.1rem;
+}
+
+.solo-result .primary {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 5px;
+}
+
+.solo-result small {
+  display: block;
+  margin-top: 12px;
+  color: rgba(255,255,255,.4);
+}
+
+
+/* =====================================
+   MOBILE
+   ===================================== */
+
+@media (max-width: 700px) {
+
+  .solo-game {
+    width: min(100% - 18px, 520px);
+    min-height: 100dvh;
+    padding: 14px 0 115px;
+  }
+
+  .solo-top {
+    margin-bottom: 8px;
+  }
+
+  .solo-levels {
+    gap: 4px;
+    margin-bottom: 15px;
+  }
+
+  .solo-level {
+    padding: 7px 2px;
+  }
+
+  .solo-level strong {
+    font-size: .64rem;
+  }
+
+  .solo-level small {
+    font-size: .57rem;
+  }
+
+  .solo-play {
+    width: 84px;
+    height: 84px;
+  }
+
+  .solo-play svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  .solo-duration {
+    margin: 7px 0 12px;
+  }
+
+
+  /*
+  Buscador y botones siempre accesibles.
+  */
+
+  .solo-controls {
+    position: sticky;
+
+    bottom:
+      max(
+        8px,
+        env(safe-area-inset-bottom)
+      );
+
+    z-index: 50;
+
+    padding: 8px;
+
+    border-radius: 17px;
+
+    border:
+      1px solid
+      rgba(255,255,255,.08);
+
+    background:
+      rgba(17,17,17,.95);
+
+    backdrop-filter:
+      blur(18px);
+
+    -webkit-backdrop-filter:
+      blur(18px);
+  }
+
+  .solo-controls .autocomplete {
+    position: relative;
+  }
+
+  .solo-controls
+  .spotify-game-results {
+    position: absolute;
+
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+
+    max-height: 240px;
+
+    overflow-y: auto;
+
+    z-index: 80;
+  }
+
+  .solo-search {
+    height: 44px;
+  }
+
+  .solo-actions {
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  .solo-actions button {
+    min-height: 42px;
+    font-size: .8rem;
+  }
+
+  .solo-result {
+    margin-top: 18px;
+  }
+
+  .solo-result img {
+    width: 110px;
+    height: 110px;
+  }
+
+  .solo-result h2 {
+    font-size: 1.3rem;
+  }
+}

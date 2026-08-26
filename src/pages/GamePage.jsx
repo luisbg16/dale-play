@@ -7,12 +7,7 @@ import {
 import {
   Play,
   Pause,
-  Search,
-  SkipForward,
-  ArrowRight,
-  CheckCircle2,
-  X,
-  Trophy
+  SkipForward
 } from 'lucide-react'
 
 import {
@@ -91,8 +86,7 @@ function sameSong(song, guess) {
   if (
     song.spotify_id &&
     guess.spotify_id &&
-    song.spotify_id ===
-      guess.spotify_id
+    song.spotify_id === guess.spotify_id
   ) {
     return true
   }
@@ -190,13 +184,6 @@ function searchLibrary(
 
 
 export default function GamePage() {
-
-  /*
-  =====================================
-  BIBLIOTECA / CANCIÓN
-  =====================================
-  */
-
   const [songs, setSongs] =
     useState([])
 
@@ -209,12 +196,6 @@ export default function GamePage() {
   const [loading, setLoading] =
     useState(true)
 
-
-  /*
-  =====================================
-  JUEGO
-  =====================================
-  */
 
   const [levelIndex, setLevelIndex] =
     useState(0)
@@ -234,21 +215,6 @@ export default function GamePage() {
   const [earnedPoints, setEarnedPoints] =
     useState(0)
 
-
-  const currentLevel =
-    LEVELS[levelIndex]
-
-
-  const isLastLevel =
-    levelIndex ===
-    LEVELS.length - 1
-
-
-  /*
-  =====================================
-  BUSCADOR
-  =====================================
-  */
 
   const [query, setQuery] =
     useState('')
@@ -275,26 +241,7 @@ export default function GamePage() {
 
   /*
   =====================================
-  NOMBRE / SCORE
-  =====================================
-  */
-
-  const [playerName, setPlayerName] =
-    useState('')
-
-  const [scoreSaved, setScoreSaved] =
-    useState(false)
-
-  const [savingScore, setSavingScore] =
-    useState(false)
-
-  const [leaderboard, setLeaderboard] =
-    useState([])
-
-
-  /*
-  =====================================
-  SPOTIFY DOBLE CONTROLLER
+  SPOTIFY DOBLE PLAYER
   =====================================
   */
 
@@ -322,13 +269,6 @@ export default function GamePage() {
   const playedBRef =
     useRef(false)
 
-  const spotifyIdARef =
-    useRef(null)
-
-  const spotifyIdBRef =
-    useRef(null)
-
-
   const stopTimerRef =
     useRef(null)
 
@@ -336,14 +276,28 @@ export default function GamePage() {
     useRef(false)
 
 
-  const [spotifyReady, setSpotifyReady] =
-    useState(false)
+  const [
+    spotifyReady,
+    setSpotifyReady
+  ] = useState(false)
 
-  const [isPlaying, setIsPlaying] =
-    useState(false)
+  const [
+    isPlaying,
+    setIsPlaying
+  ] = useState(false)
 
-  const [audioStarting, setAudioStarting] =
-    useState(false)
+  const [
+    audioStarting,
+    setAudioStarting
+  ] = useState(false)
+
+
+  const currentLevel =
+    LEVELS[levelIndex]
+
+  const isLastLevel =
+    levelIndex ===
+    LEVELS.length - 1
 
 
   /*
@@ -372,9 +326,6 @@ export default function GamePage() {
 
 
   async function initializeGame() {
-    setLoading(true)
-
-
     try {
       const {
         data,
@@ -450,14 +401,16 @@ export default function GamePage() {
         IFrameAPI
 
 
-      await createSpotifyControllers(
+      /*
+      Los DIV de Spotify existen
+      desde el primer render.
+      */
+
+      createSpotifyControllers(
         IFrameAPI,
         firstSong,
         upcoming
       )
-
-
-      await loadLeaderboard()
 
 
     } catch (error) {
@@ -507,7 +460,7 @@ export default function GamePage() {
   =====================================
   */
 
-  async function createSpotifyControllers(
+  function createSpotifyControllers(
     IFrameAPI,
     currentSong,
     upcomingSong
@@ -527,8 +480,8 @@ export default function GamePage() {
       !elementA ||
       !elementB
     ) {
-      setMessage(
-        'No se pudo montar Spotify.'
+      console.error(
+        'No se encontraron los reproductores de Spotify.'
       )
 
       return
@@ -546,9 +499,6 @@ export default function GamePage() {
       controller => {
         controllerARef.current =
           controller
-
-        spotifyIdARef.current =
-          currentSong.spotify_id
 
         activeSlotRef.current =
           'A'
@@ -573,9 +523,6 @@ export default function GamePage() {
         controllerBRef.current =
           controller
 
-        spotifyIdBRef.current =
-          upcomingSong.spotify_id
-
         setupControllerEvents(
           controller,
           'B'
@@ -597,7 +544,6 @@ export default function GamePage() {
         ) {
           readyARef.current =
             true
-
         } else {
           readyBRef.current =
             true
@@ -659,7 +605,6 @@ export default function GamePage() {
     ) {
       playedARef.current =
         true
-
     } else {
       playedBRef.current =
         true
@@ -688,14 +633,9 @@ export default function GamePage() {
     )
 
 
-    setIsPlaying(
-      false
-    )
+    setIsPlaying(false)
 
-    setAudioStarting(
-      false
-    )
-
+    setAudioStarting(false)
 
     stoppingRef.current =
       false
@@ -750,13 +690,9 @@ export default function GamePage() {
     )
 
 
-    setIsPlaying(
-      false
-    )
+    setIsPlaying(false)
 
-    setAudioStarting(
-      false
-    )
+    setAudioStarting(false)
 
 
     setTimeout(
@@ -807,13 +743,9 @@ export default function GamePage() {
       1000
 
 
-    setAudioStarting(
-      true
-    )
+    setAudioStarting(true)
 
-    setIsPlaying(
-      true
-    )
+    setIsPlaying(true)
 
 
     stopTimerRef.current =
@@ -825,11 +757,15 @@ export default function GamePage() {
       )
 
 
+    /*
+    ESTA ES LA LÓGICA QUE YA
+    NOS FUNCIONABA BIEN.
+    */
+
     if (
       activeAlreadyPlayed()
     ) {
       controller.restart()
-
     } else {
       markActiveAsPlayed()
 
@@ -840,7 +776,7 @@ export default function GamePage() {
 
   /*
   =====================================
-  BUSCADOR LOCAL
+  BUSCADOR
   =====================================
   */
 
@@ -885,7 +821,6 @@ export default function GamePage() {
             )
           )
 
-
           setSearching(false)
         },
         90
@@ -925,11 +860,11 @@ export default function GamePage() {
 
   /*
   =====================================
-  PASAR NIVEL / RENDIRSE
+  PASAR NIVEL
   =====================================
   */
 
-  function registerFailure(text) {
+  function passLevel() {
     if (
       status !== 'playing'
     ) {
@@ -947,7 +882,10 @@ export default function GamePage() {
           level:
             currentLevel.label,
 
-          text,
+          text:
+            isLastLevel
+              ? 'Rendirse'
+              : 'Pasar nivel',
 
           correct:
             false
@@ -963,51 +901,22 @@ export default function GamePage() {
     setSearchResults([])
 
 
-    /*
-    Todavía hay otro nivel.
-    */
-
     if (
-      levelIndex <
-      LEVELS.length - 1
+      isLastLevel
     ) {
-      setLevelIndex(
-        current =>
-          current + 1
-      )
-
-
-      setMessage(
-        'Pasaste al siguiente nivel.'
-      )
-
+      finishLost()
 
       return
     }
 
 
-    /*
-    Ya estaba en Fácil:
-    termina la canción.
-    */
-
-    giveUp()
-  }
+    setLevelIndex(
+      current =>
+        current + 1
+    )
 
 
-  function passLevel() {
-    if (
-      isLastLevel
-    ) {
-      registerFailure(
-        'Rendirse'
-      )
-
-    } else {
-      registerFailure(
-        'Pasar nivel'
-      )
-    }
+    setMessage('')
   }
 
 
@@ -1023,14 +932,6 @@ export default function GamePage() {
       !song ||
       status !== 'playing'
     ) {
-      if (
-        !selectedGuess
-      ) {
-        setMessage(
-          'Selecciona una canción.'
-        )
-      }
-
       return
     }
 
@@ -1046,12 +947,51 @@ export default function GamePage() {
 
 
     if (!correct) {
-      registerFailure(
-        `${selectedGuess.title} — ${selectedGuess.artist}`
+      setAttempts(
+        current => [
+          ...current,
+          {
+            level:
+              currentLevel.label,
+
+            text:
+              `${selectedGuess.title} — ${selectedGuess.artist}`,
+
+            correct:
+              false
+          }
+        ]
       )
+
+
+      setQuery('')
+
+      setSelectedGuess(null)
+
+      setSearchResults([])
+
+
+      if (
+        isLastLevel
+      ) {
+        finishLost()
+
+        return
+      }
+
+
+      setLevelIndex(
+        current =>
+          current + 1
+      )
+
 
       return
     }
+
+
+    const points =
+      currentLevel.points
 
 
     setAttempts(
@@ -1071,10 +1011,6 @@ export default function GamePage() {
     )
 
 
-    const points =
-      currentLevel.points
-
-
     setEarnedPoints(
       points
     )
@@ -1091,9 +1027,7 @@ export default function GamePage() {
     )
 
 
-    setMessage(
-      `¡Correcto! +${points} pts`
-    )
+    setMessage('')
 
 
     setQuery('')
@@ -1101,37 +1035,27 @@ export default function GamePage() {
     setSelectedGuess(null)
 
     setSearchResults([])
-
-    setScoreSaved(false)
   }
 
 
-  function giveUp() {
+  function finishLost() {
     stopSpotify()
-
 
     setEarnedPoints(
       0
     )
 
-
     setStatus(
       'lost'
     )
 
-
-    setMessage(
-      'Te rendiste.'
-    )
-
+    setMessage('')
 
     setQuery('')
 
     setSelectedGuess(null)
 
     setSearchResults([])
-
-    setScoreSaved(false)
   }
 
 
@@ -1141,7 +1065,7 @@ export default function GamePage() {
   =====================================
   */
 
-  async function nextSong() {
+  function nextSong() {
     if (
       status === 'playing'
     ) {
@@ -1167,11 +1091,6 @@ export default function GamePage() {
       )
 
 
-    /*
-    Cambiamos al controller que ya
-    estaba precargado.
-    */
-
     const nextSlot =
       activeSlotRef.current === 'A'
         ? 'B'
@@ -1186,23 +1105,17 @@ export default function GamePage() {
       newCurrent
     )
 
-
     setNextSongData(
       newUpcoming
     )
 
-
-    setLevelIndex(
-      0
-    )
+    setLevelIndex(0)
 
     setAttempts([])
 
     setStatus(
       'playing'
     )
-
-    setMessage('')
 
     setEarnedPoints(
       0
@@ -1214,13 +1127,8 @@ export default function GamePage() {
 
     setSearchResults([])
 
-    setScoreSaved(false)
+    setMessage('')
 
-
-    /*
-    El nuevo slot activo ya contiene
-    la canción que estaba precargada.
-    */
 
     if (
       nextSlot === 'A'
@@ -1228,26 +1136,18 @@ export default function GamePage() {
       playedARef.current =
         false
 
-
       setSpotifyReady(
         readyARef.current
       )
-
     } else {
       playedBRef.current =
         false
-
 
       setSpotifyReady(
         readyBRef.current
       )
     }
 
-
-    /*
-    Ahora cargamos la próxima canción
-    en el controller que quedó libre.
-    */
 
     const standbyController =
       nextSlot === 'A'
@@ -1271,19 +1171,12 @@ export default function GamePage() {
 
         playedBRef.current =
           false
-
-        spotifyIdBRef.current =
-          newUpcoming.spotify_id
-
       } else {
         readyARef.current =
           false
 
         playedARef.current =
           false
-
-        spotifyIdARef.current =
-          newUpcoming.spotify_id
       }
 
 
@@ -1299,168 +1192,17 @@ export default function GamePage() {
 
   /*
   =====================================
-  SCORE
-  =====================================
-  */
-
-  async function saveScore() {
-    if (
-      !playerName.trim() ||
-      scoreSaved ||
-      savingScore
-    ) {
-      return
-    }
-
-
-    setSavingScore(
-      true
-    )
-
-
-    try {
-      const {
-        error
-      } =
-        await supabase
-          .from('scores')
-          .insert({
-            player_name:
-              playerName
-                .trim()
-                .slice(
-                  0,
-                  30
-                ),
-
-            score,
-
-            song_title:
-              song?.title ||
-              null,
-
-            song_artist:
-              song?.artist ||
-              null,
-
-            difficulty:
-              currentLevel.label
-          })
-
-
-      if (error) {
-        throw error
-      }
-
-
-      setScoreSaved(
-        true
-      )
-
-
-      await loadLeaderboard()
-
-
-    } catch (error) {
-      console.error(error)
-
-
-      setMessage(
-        error.message ||
-        'No se pudo guardar el puntaje.'
-      )
-
-    } finally {
-      setSavingScore(
-        false
-      )
-    }
-  }
-
-
-  async function loadLeaderboard() {
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from('scores')
-        .select(
-          'id, player_name, score, created_at'
-        )
-        .order(
-          'score',
-          {
-            ascending: false
-          }
-        )
-        .limit(10)
-
-
-    if (error) {
-      console.error(error)
-
-      return
-    }
-
-
-    setLeaderboard(
-      data || []
-    )
-  }
-
-
-  /*
-  =====================================
-  LOADING
-  =====================================
-  */
-
-  if (
-    loading
-  ) {
-    return (
-      <section className="game-wrap">
-
-        <div className="notice">
-          Cargando juego...
-        </div>
-
-      </section>
-    )
-  }
-
-
-  if (!song) {
-    return (
-      <section className="game-wrap">
-
-        <div className="notice">
-
-          {message ||
-            'No hay canciones disponibles.'}
-
-        </div>
-
-      </section>
-    )
-  }
-
-
-  /*
-  =====================================
   UI
   =====================================
   */
 
   return (
-    <section className="game-wrap">
+    <section className="solo-game">
 
 
       {/*
-      Los dos embeds permanecen montados
-      para poder precargar la canción
-      siguiente.
+      SIEMPRE montados.
+      Este era el bug del audio.
       */}
 
       <div className="spotify-hidden-player">
@@ -1476,195 +1218,140 @@ export default function GamePage() {
       </div>
 
 
-      <div className="game-header">
+      {loading ? (
 
-        <div>
+        <div className="solo-loading">
+          Cargando...
+        </div>
 
-          <span className="game-eyebrow">
-            DALE PLAY
-          </span>
+      ) : !song ? (
 
-          <h1>
-            ¿Qué canción es?
-          </h1>
+        <div className="solo-loading">
+
+          {message ||
+            'No hay canciones disponibles.'}
 
         </div>
 
-
-        <div className="game-score">
-
-          <Trophy size={18} />
-
-          {score} pts
-
-        </div>
-
-      </div>
-
-
-      {/*
-      =====================================
-      JUGANDO
-      =====================================
-      */}
-
-      {status === 'playing' && (
+      ) : status === 'playing' ? (
 
         <>
 
-          <div className="room-main-play-area">
 
-            <div className="room-level-card">
+          <div className="solo-top">
 
-              <span>
-                NIVEL ACTUAL
-              </span>
-
-              <strong>
-                {currentLevel.label}
-              </strong>
-
-              <small>
-                {currentLevel.duration}s de canción
-              </small>
-
-            </div>
-
-
-            <div className="difficulty-row">
-
-              {LEVELS.map(
-                (
-                  level,
-                  index
-                ) => (
-
-                  <div
-                    key={level.id}
-                    className={
-                      `level-pill ${level.id} ${
-                        index === levelIndex
-                          ? 'current'
-                          : ''
-                      } ${
-                        index < levelIndex
-                          ? 'used'
-                          : ''
-                      }`
-                    }
-                  >
-
-                    {level.label}
-
-                    <small>
-                      {level.duration}s
-                    </small>
-
-                  </div>
-
-                )
-              )}
-
-            </div>
-
-
-            <div className="room-potential-score">
-
-              <strong>
-                {currentLevel.points} pts
-              </strong>
-
-              <span>
-                disponibles
-              </span>
-
-            </div>
-
-
-            <button
-              className={
-                `play-button ${
-                  audioStarting
-                    ? 'audio-starting'
-                    : ''
-                }`
-              }
-              onClick={
-                togglePlay
-              }
-              disabled={
-                !spotifyReady
-              }
-            >
-
-              {isPlaying ? (
-
-                <Pause
-                  size={58}
-                  fill="currentColor"
-                />
-
-              ) : (
-
-                <Play
-                  size={58}
-                  fill="currentColor"
-                />
-
-              )}
-
-            </button>
-
-
-            <div className="seconds">
-
-              {!spotifyReady
-                ? 'Preparando audio...'
-                : `${currentLevel.duration}s`}
-
-            </div>
+            <span>
+              {score} pts
+            </span>
 
           </div>
 
 
-          {/*
-          =====================================
-          BUSCADOR + ACCIONES
-          =====================================
-          */}
+          <div className="solo-levels">
 
-          <div className="guess-area room-mobile-controls">
+            {LEVELS.map(
+              (
+                level,
+                index
+              ) => (
+
+                <div
+                  key={level.id}
+                  className={
+                    `solo-level ${
+                      index === levelIndex
+                        ? 'active'
+                        : ''
+                    } ${
+                      index < levelIndex
+                        ? 'used'
+                        : ''
+                    }`
+                  }
+                >
+
+                  <strong>
+                    {level.label}
+                  </strong>
+
+                  <small>
+                    {level.duration}s
+                  </small>
+
+                </div>
+
+              )
+            )}
+
+          </div>
+
+
+          <button
+            className="solo-play"
+            onClick={
+              togglePlay
+            }
+            disabled={
+              !spotifyReady
+            }
+          >
+
+            {isPlaying ? (
+
+              <Pause
+                size={46}
+                fill="currentColor"
+              />
+
+            ) : (
+
+              <Play
+                size={46}
+                fill="currentColor"
+              />
+
+            )}
+
+          </button>
+
+
+          <div className="solo-duration">
+
+            {!spotifyReady
+              ? 'Preparando audio...'
+              : `${currentLevel.duration}s · ${currentLevel.points} pts`}
+
+          </div>
+
+
+          <div className="solo-controls">
 
             <div className="autocomplete">
 
-              <div className="spotify-game-search">
+              <input
+                className="solo-search"
+                value={query}
+                placeholder="Busca una canción..."
+                onChange={
+                  event => {
+                    setQuery(
+                      event.target.value
+                    )
 
-                <Search size={20} />
-
-
-                <input
-                  value={query}
-                  placeholder="Busca una canción..."
-                  onChange={
-                    event => {
-                      setQuery(
-                        event.target.value
-                      )
-
-                      setSelectedGuess(
-                        null
-                      )
-                    }
+                    setSelectedGuess(
+                      null
+                    )
                   }
-                />
-
-              </div>
+                }
+              />
 
 
               {searching && (
 
                 <div className="spotify-searching">
-                  Buscando canciones...
+
+                  Buscando...
+
                 </div>
 
               )}
@@ -1724,11 +1411,16 @@ export default function GamePage() {
             </div>
 
 
-            <div className="guess-actions">
+            <div className="solo-actions">
 
               <button
                 className="guess-btn"
-                onClick={guess}
+                onClick={
+                  guess
+                }
+                disabled={
+                  !selectedGuess
+                }
               >
                 Adivinar
               </button>
@@ -1747,8 +1439,9 @@ export default function GamePage() {
                 }
               >
 
-                <SkipForward />
-
+                <SkipForward
+                  size={17}
+                />
 
                 {isLastLevel
                   ? 'Rendirse'
@@ -1761,25 +1454,9 @@ export default function GamePage() {
           </div>
 
 
-          {message && (
-
-            <div className="message">
-
-              {message}
-
-            </div>
-
-          )}
-
-
           {attempts.length > 0 && (
 
-            <div className="attempt-history">
-
-              <h3>
-                Tus intentos
-              </h3>
-
+            <div className="solo-attempts">
 
               {attempts.map(
                 (
@@ -1788,34 +1465,22 @@ export default function GamePage() {
                 ) => (
 
                   <div
-                    className={
-                      `attempt-row ${
-                        item.correct
-                          ? 'correct'
-                          : ''
-                      }`
-                    }
                     key={index}
+                    className={
+                      item.correct
+                        ? 'correct'
+                        : ''
+                    }
                   >
 
-                    <span className="attempt-number">
-
+                    <span>
                       {item.correct
                         ? '✓'
-                        : '✕'}
-
+                        : '×'}
                     </span>
 
-
-                    <strong>
-                      {item.level}
-                    </strong>
-
-
-                    <span className="attempt-answer">
-
+                    <span>
                       {item.text}
-
                     </span>
 
                   </div>
@@ -1829,18 +1494,9 @@ export default function GamePage() {
 
         </>
 
-      )}
+      ) : (
 
-
-      {/*
-      =====================================
-      RESULTADO
-      =====================================
-      */}
-
-      {status !== 'playing' && (
-
-        <div className="game-result-card">
+        <div className="solo-result">
 
 
           {song.album_image_url && (
@@ -1855,30 +1511,6 @@ export default function GamePage() {
           )}
 
 
-          {status === 'won' ? (
-
-            <CheckCircle2
-              size={34}
-            />
-
-          ) : (
-
-            <X
-              size={34}
-            />
-
-          )}
-
-
-          <span>
-
-            {status === 'won'
-              ? '¡La pegaste!'
-              : 'La canción era'}
-
-          </span>
-
-
           <h2>
             {song.title}
           </h2>
@@ -1891,194 +1523,26 @@ export default function GamePage() {
 
           {status === 'won' && (
 
-            <strong className="round-earned">
-
+            <strong>
               +{earnedPoints} pts
-
             </strong>
 
           )}
 
 
-          {/*
-          LO PRIMERO DESPUÉS DEL RESULTADO:
-          siguiente canción.
-          */}
-
           <button
-            className="primary next-song-immediate"
+            className="primary"
             onClick={
               nextSong
             }
           >
-
-            <ArrowRight />
-
             Siguiente canción
-
           </button>
 
 
-          {attempts.length > 0 && (
-
-            <div className="attempt-history">
-
-              <h3>
-                Tus intentos
-              </h3>
-
-
-              {attempts.map(
-                (
-                  item,
-                  index
-                ) => (
-
-                  <div
-                    className={
-                      `attempt-row ${
-                        item.correct
-                          ? 'correct'
-                          : ''
-                      }`
-                    }
-                    key={index}
-                  >
-
-                    <span className="attempt-number">
-
-                      {item.correct
-                        ? '✓'
-                        : '✕'}
-
-                    </span>
-
-
-                    <strong>
-                      {item.level}
-                    </strong>
-
-
-                    <span className="attempt-answer">
-
-                      {item.text}
-
-                    </span>
-
-                  </div>
-
-                )
-              )}
-
-            </div>
-
-          )}
-
-
-          <div className="save-score-card">
-
-            <h3>
-              Guardar puntaje
-            </h3>
-
-
-            <p>
-
-              Puntaje acumulado:
-              {' '}
-
-              <strong>
-                {score} pts
-              </strong>
-
-            </p>
-
-
-            <input
-              value={playerName}
-              maxLength={30}
-              placeholder="Tu nombre"
-              disabled={
-                scoreSaved
-              }
-              onChange={
-                event =>
-                  setPlayerName(
-                    event.target.value
-                  )
-              }
-            />
-
-
-            <button
-              className="primary"
-              onClick={
-                saveScore
-              }
-              disabled={
-                !playerName.trim() ||
-                scoreSaved ||
-                savingScore
-              }
-            >
-
-              {savingScore
-                ? 'Guardando...'
-                : scoreSaved
-                  ? 'Puntaje guardado'
-                  : 'Guardar puntaje'}
-
-            </button>
-
-          </div>
-
-
-          {leaderboard.length > 0 && (
-
-            <div className="live-scoreboard">
-
-              <h3>
-
-                <Trophy size={19} />
-
-                Mejores puntajes
-
-              </h3>
-
-
-              {leaderboard.map(
-                (
-                  item,
-                  index
-                ) => (
-
-                  <div
-                    className="live-score-row"
-                    key={item.id}
-                  >
-
-                    <span>
-                      #{index + 1}
-                    </span>
-
-
-                    <strong>
-                      {item.player_name}
-                    </strong>
-
-
-                    <b>
-                      {item.score} pts
-                    </b>
-
-                  </div>
-
-                )
-              )}
-
-            </div>
-
-          )}
+          <small>
+            Total: {score} pts
+          </small>
 
         </div>
 
