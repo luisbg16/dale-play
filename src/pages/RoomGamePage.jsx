@@ -237,6 +237,17 @@ function formatTime(seconds) {
 }
 
 
+function generateClipStart() {
+  const min = 10
+  const max = 55
+
+  return Math.floor(
+    Math.random() *
+    (max - min + 1)
+  ) + min
+}
+
+
 export default function RoomGamePage() {
   const { code } =
     useParams()
@@ -244,12 +255,6 @@ export default function RoomGamePage() {
   const navigate =
     useNavigate()
 
-
-  /*
-  =====================================
-  SALA
-  =====================================
-  */
 
   const [room, setRoom] =
     useState(null)
@@ -269,12 +274,6 @@ export default function RoomGamePage() {
   const [answers, setAnswers] =
     useState([])
 
-
-  /*
-  =====================================
-  RONDA
-  =====================================
-  */
 
   const [levelIndex, setLevelIndex] =
     useState(0)
@@ -297,12 +296,6 @@ export default function RoomGamePage() {
   ] = useState(0)
 
 
-  /*
-  =====================================
-  TIMER GLOBAL
-  =====================================
-  */
-
   const [timeLeft, setTimeLeft] =
     useState(ROUND_SECONDS)
 
@@ -311,21 +304,19 @@ export default function RoomGamePage() {
     setPreparationLeft
   ] = useState(0)
 
-  const [roundActive, setRoundActive] =
-    useState(false)
+  const [
+    roundActive,
+    setRoundActive
+  ] = useState(false)
 
-  const [roundExpired, setRoundExpired] =
-    useState(false)
+  const [
+    roundExpired,
+    setRoundExpired
+  ] = useState(false)
 
   const timeoutSubmittedRef =
     useRef(false)
 
-
-  /*
-  =====================================
-  BUSCADOR LOCAL
-  =====================================
-  */
 
   const [query, setQuery] =
     useState('')
@@ -340,8 +331,10 @@ export default function RoomGamePage() {
     setSearchResults
   ] = useState([])
 
-  const [searching, setSearching] =
-    useState(false)
+  const [
+    searching,
+    setSearching
+  ] = useState(false)
 
   const searchTimer =
     useRef(null)
@@ -362,34 +355,31 @@ export default function RoomGamePage() {
   const controllerRef =
     useRef(null)
 
-  const loadedSpotifyIdRef =
-    useRef(null)
-
-  const hasPlayedCurrentSongRef =
-    useRef(false)
-
   const stopTimerRef =
     useRef(null)
 
   const stoppingRef =
     useRef(false)
 
-
-  const [spotifyReady, setSpotifyReady] =
-    useState(false)
-
-  const [isPlaying, setIsPlaying] =
-    useState(false)
-
-  const [audioStarting, setAudioStarting] =
-    useState(false)
+  const spotifyLoadTimerRef =
+    useRef(null)
 
 
-  /*
-  =====================================
-  MENSAJES
-  =====================================
-  */
+  const [
+    spotifyReady,
+    setSpotifyReady
+  ] = useState(false)
+
+  const [
+    isPlaying,
+    setIsPlaying
+  ] = useState(false)
+
+  const [
+    audioStarting,
+    setAudioStarting
+  ] = useState(false)
+
 
   const [message, setMessage] =
     useState('')
@@ -437,6 +427,10 @@ export default function RoomGamePage() {
         searchTimer.current
       )
 
+      clearTimeout(
+        spotifyLoadTimerRef.current
+      )
+
       controllerRef.current
         ?.destroy?.()
     }
@@ -477,7 +471,7 @@ export default function RoomGamePage() {
 
     if (!session) {
       setMessage(
-        'No estás registrado como jugador de esta sala.'
+        'No estás registrado como jugador.'
       )
 
       return
@@ -490,7 +484,7 @@ export default function RoomGamePage() {
         JSON.parse(session)
     } catch {
       setMessage(
-        'No pude recuperar tu sesión de jugador.'
+        'No pude recuperar tu sesión.'
       )
 
       return
@@ -525,23 +519,12 @@ export default function RoomGamePage() {
         roomData.current_song_id
       )
     }
-
-    if (
-      playerSession.is_host &&
-      roomData.status === 'playing' &&
-      roomData.current_round > 0 &&
-      !roomData.round_started_at
-    ) {
-      await setRoundStart(
-        roomData.id
-      )
-    }
   }
 
 
   /*
   =====================================
-  CANCIONES
+  DATOS
   =====================================
   */
 
@@ -577,48 +560,528 @@ export default function RoomGamePage() {
   }
 
 
-  /*
-  =====================================
-  INICIO SINCRONIZADO
-  =====================================
-  */
-
-  async function setRoundStart(
-    roomId
+  async function loadSong(
+    songId
   ) {
-    const startAt =
-      new Date(
-        Date.now() +
-        PREPARE_SECONDS *
-          1000
-      )
-        .toISOString()
-
     const {
       data,
       error
     } =
       await supabase
-        .from('rooms')
-        .update({
-          round_started_at:
-            startAt
-        })
+        .from('songs')
+        .select('*')
         .eq(
           'id',
+          songId
+        )
+        .single()
+
+    if (error) {
+      setMessage(
+        error.message
+      )
+
+      return
+    }
+
+    setSong(
+      data
+    )
+  }
+
+
+  async function loadPlayers(
+    roomId
+  ) {
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from('room_players')
+        .select('*')
+        .eq(
+          'room_id',
           roomId
         )
-        .select()
-        .single()
+        .order(
+          'score',
+          {
+            ascending: false
+          }
+        )
 
     if (error) {
       console.error(error)
       return
     }
 
-    if (data) {
-      setRoom(data)
+    setPlayers(
+      data || []
+    )
+  }
+
+
+  async function loadAnswers(
+    roomId,
+    roundNumber,
+    currentPlayerId = null
+  ) {
+    if (!roundNumber) {
+      setAnswers([])
+      return
     }
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from('room_answers')
+        .select('*')
+        .eq(
+          'room_id',
+          roomId
+        )
+        .eq(
+          'round_number',
+          roundNumber
+        )
+        .order(
+          'created_at',
+          {
+            ascending: true
+          }
+        )
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    const list =
+      data || []
+
+    setAnswers(
+      list
+    )
+
+    if (
+      currentPlayerId
+    ) {
+      const ownAnswer =
+        list.find(
+          item =>
+            item.player_id ===
+            currentPlayerId
+        )
+
+      if (
+        ownAnswer
+      ) {
+        setRoundDone(
+          true
+        )
+
+        setRoundPoints(
+          ownAnswer.points || 0
+        )
+
+        if (
+          ownAnswer.correct
+        ) {
+          const ownTime =
+            new Date(
+              ownAnswer.created_at
+            ).getTime()
+
+          const previous =
+            list.filter(
+              item =>
+                item.correct &&
+                new Date(
+                  item.created_at
+                ).getTime() <=
+                  ownTime
+            )
+
+          setCorrectPosition(
+            previous.length
+          )
+
+        } else {
+          setCorrectPosition(
+            0
+          )
+        }
+      }
+    }
+  }
+
+
+  /*
+  =====================================
+  PREPARAR SPOTIFY
+  =====================================
+  */
+
+  useEffect(() => {
+    if (
+      !song?.spotify_id ||
+      !room ||
+      !player
+    ) {
+      return
+    }
+
+    clearTimeout(
+      spotifyLoadTimerRef.current
+    )
+
+    spotifyLoadTimerRef.current =
+      setTimeout(
+        () => {
+          prepareSpotifySong(
+            song.spotify_id
+          )
+        },
+        50
+      )
+
+    return () => {
+      clearTimeout(
+        spotifyLoadTimerRef.current
+      )
+    }
+  }, [
+    song?.spotify_id,
+    room?.id,
+    room?.clip_start,
+    player?.player_id
+  ])
+
+
+  async function prepareSpotifySong(
+    spotifyId
+  ) {
+    stopSpotify()
+
+    setSpotifyReady(
+      false
+    )
+
+    try {
+      const IFrameAPI =
+        iframeApiRef.current ||
+        await loadSpotifyIframeApi()
+
+      iframeApiRef.current =
+        IFrameAPI
+
+      const uri =
+        `spotify:track:${spotifyId}`
+
+      const sharedStart =
+        Number(
+          room?.clip_start ||
+          0
+        )
+
+
+      /*
+      CONTROLLER EXISTENTE
+      */
+
+      if (
+        controllerRef.current
+      ) {
+        controllerRef.current
+          .loadEntity(
+            uri,
+            false,
+            sharedStart
+          )
+
+        setTimeout(
+          () => {
+            setSpotifyReady(
+              true
+            )
+          },
+          600
+        )
+
+        return
+      }
+
+
+      /*
+      PRIMER CONTROLLER
+      */
+
+      const element =
+        document.getElementById(
+          'spotify-room-embed'
+        )
+
+      if (!element) {
+        return
+      }
+
+
+      IFrameAPI.createController(
+        element,
+        {
+          width: '100%',
+          height: 80,
+          uri
+        },
+        controller => {
+          controllerRef.current =
+            controller
+
+          setupSpotifyEvents(
+            controller
+          )
+
+          controller.loadEntity(
+            uri,
+            false,
+            sharedStart
+          )
+        }
+      )
+
+    } catch (error) {
+      console.error(
+        'Spotify:',
+        error
+      )
+
+      setMessage(
+        'No se pudo preparar el audio.'
+      )
+    }
+  }
+
+
+  function setupSpotifyEvents(
+    controller
+  ) {
+    controller.addListener(
+      'ready',
+      () => {
+        setSpotifyReady(
+          true
+        )
+      }
+    )
+
+    controller.addListener(
+      'playback_started',
+      () => {
+        setAudioStarting(
+          false
+        )
+
+        setIsPlaying(
+          true
+        )
+      }
+    )
+  }
+
+
+  /*
+  =====================================
+  DETENER AUDIO
+  =====================================
+  */
+
+  function stopSpotify() {
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+    const controller =
+      controllerRef.current
+
+    controller?.pause()
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      100
+    )
+
+    setIsPlaying(
+      false
+    )
+
+    setAudioStarting(
+      false
+    )
+
+    stoppingRef.current =
+      false
+  }
+
+
+  function hardStopSpotify() {
+    if (
+      stoppingRef.current
+    ) {
+      return
+    }
+
+    stoppingRef.current =
+      true
+
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+    const controller =
+      controllerRef.current
+
+    controller?.pause()
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      80
+    )
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      180
+    )
+
+    setTimeout(
+      () => {
+        controller?.pause()
+      },
+      350
+    )
+
+    setIsPlaying(
+      false
+    )
+
+    setAudioStarting(
+      false
+    )
+
+    setTimeout(
+      () => {
+        stoppingRef.current =
+          false
+      },
+      450
+    )
+  }
+
+
+  /*
+  =====================================
+  PLAY
+  MISMO PUNTO PARA TODOS
+  =====================================
+  */
+
+  function togglePlay() {
+    const controller =
+      controllerRef.current
+
+    if (
+      !controller ||
+      !spotifyReady ||
+      !roundActive ||
+      roundDone
+    ) {
+      return
+    }
+
+    if (
+      isPlaying ||
+      audioStarting
+    ) {
+      hardStopSpotify()
+
+      return
+    }
+
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+    stoppingRef.current =
+      false
+
+
+    const durationMs =
+      currentLevel.duration *
+      1000
+
+
+    const sharedStart =
+      Number(
+        room?.clip_start ||
+        0
+      )
+
+
+    /*
+    Todos reciben el mismo clip_start.
+    Antes de cada reproducción
+    buscamos ese punto exacto.
+    */
+
+    controller.seek(
+      sharedStart
+    )
+
+
+    setAudioStarting(
+      true
+    )
+
+    setIsPlaying(
+      true
+    )
+
+
+    /*
+    Pequeñísimo margen para que el seek
+    se aplique antes de reproducir.
+    */
+
+    setTimeout(
+      () => {
+        controller.play()
+      },
+      120
+    )
+
+
+    /*
+    Cortamos el fragmento.
+    Sumamos los mismos 120 ms usados
+    para el seek para que el tiempo
+    audible siga siendo el del nivel.
+    */
+
+    stopTimerRef.current =
+      setTimeout(
+        () => {
+          hardStopSpotify()
+        },
+        durationMs + 120
+      )
   }
 
 
@@ -629,7 +1092,9 @@ export default function RoomGamePage() {
   */
 
   useEffect(() => {
-    if (!room?.id) {
+    if (
+      !room?.id
+    ) {
       return
     }
 
@@ -655,21 +1120,23 @@ export default function RoomGamePage() {
             const updated =
               payload.new
 
-            const previousRound =
-              room.current_round
-
-            const previousSong =
-              room.current_song_id
-
             const roundChanged =
               updated.current_round !==
-              previousRound
+              room.current_round
 
             const songChanged =
               updated.current_song_id !==
-              previousSong
+              room.current_song_id
 
-            setRoom(updated)
+            const clipChanged =
+              updated.clip_start !==
+              room.clip_start
+
+
+            setRoom(
+              updated
+            )
+
 
             if (
               updated.status ===
@@ -678,15 +1145,17 @@ export default function RoomGamePage() {
               stopSpotify()
 
               await loadPlayers(
-                updated.id
+                roomId
               )
 
               return
             }
 
+
             if (
               roundChanged ||
-              songChanged
+              songChanged ||
+              clipChanged
             ) {
               resetRound()
 
@@ -747,6 +1216,7 @@ export default function RoomGamePage() {
 
         .subscribe()
 
+
     return () => {
       supabase.removeChannel(
         channel
@@ -756,13 +1226,14 @@ export default function RoomGamePage() {
     room?.id,
     room?.current_round,
     room?.current_song_id,
+    room?.clip_start,
     player?.player_id
   ])
 
 
   /*
   =====================================
-  TIMER DE RONDA
+  TIMER GLOBAL
   =====================================
   */
 
@@ -785,21 +1256,26 @@ export default function RoomGamePage() {
           const now =
             Date.now()
 
-          const msUntilStart =
+          const beforeStart =
             start - now
 
-          if (
-            msUntilStart > 0
-          ) {
-            setRoundActive(false)
 
-            setRoundExpired(false)
+          if (
+            beforeStart > 0
+          ) {
+            setRoundActive(
+              false
+            )
+
+            setRoundExpired(
+              false
+            )
 
             setPreparationLeft(
               Math.max(
                 1,
                 Math.ceil(
-                  msUntilStart /
+                  beforeStart /
                   1000
                 )
               )
@@ -812,9 +1288,15 @@ export default function RoomGamePage() {
             return
           }
 
-          setPreparationLeft(0)
 
-          setRoundActive(true)
+          setPreparationLeft(
+            0
+          )
+
+          setRoundActive(
+            true
+          )
+
 
           const elapsed =
             Math.floor(
@@ -825,6 +1307,7 @@ export default function RoomGamePage() {
               1000
             )
 
+
           const remaining =
             Math.max(
               0,
@@ -832,16 +1315,22 @@ export default function RoomGamePage() {
               elapsed
             )
 
+
           setTimeLeft(
             remaining
           )
 
+
           if (
             remaining <= 0
           ) {
-            setRoundActive(false)
+            setRoundActive(
+              false
+            )
 
-            setRoundExpired(true)
+            setRoundExpired(
+              true
+            )
 
             stopSpotify()
 
@@ -864,7 +1353,9 @@ export default function RoomGamePage() {
       )
 
     return () => {
-      clearInterval(timer)
+      clearInterval(
+        timer
+      )
     }
   }, [
     room?.round_started_at,
@@ -875,451 +1366,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  JUGADORES
-  =====================================
-  */
-
-  async function loadPlayers(roomId) {
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from('room_players')
-        .select('*')
-        .eq(
-          'room_id',
-          roomId
-        )
-        .order(
-          'score',
-          {
-            ascending: false
-          }
-        )
-
-    if (error) {
-      console.error(error)
-      return
-    }
-
-    setPlayers(
-      data || []
-    )
-  }
-
-
-  /*
-  =====================================
-  RESPUESTAS
-  =====================================
-  */
-
-  async function loadAnswers(
-    roomId,
-    roundNumber,
-    currentPlayerId = null
-  ) {
-    if (!roundNumber) {
-      setAnswers([])
-      return
-    }
-
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from('room_answers')
-        .select('*')
-        .eq(
-          'room_id',
-          roomId
-        )
-        .eq(
-          'round_number',
-          roundNumber
-        )
-        .order(
-          'created_at',
-          {
-            ascending: true
-          }
-        )
-
-    if (error) {
-      console.error(error)
-      return
-    }
-
-    const list =
-      data || []
-
-    setAnswers(list)
-
-    if (
-      currentPlayerId
-    ) {
-      const ownAnswer =
-        list.find(
-          item =>
-            item.player_id ===
-            currentPlayerId
-        )
-
-      if (ownAnswer) {
-        setRoundDone(true)
-
-        setRoundPoints(
-          ownAnswer.points || 0
-        )
-
-        if (
-          ownAnswer.correct
-        ) {
-          const ownCreatedAt =
-            new Date(
-              ownAnswer.created_at
-            ).getTime()
-
-          const correctBefore =
-            list.filter(
-              item =>
-                item.correct &&
-                new Date(
-                  item.created_at
-                ).getTime() <=
-                  ownCreatedAt
-            )
-
-          setCorrectPosition(
-            correctBefore.length
-          )
-        }
-      }
-    }
-  }
-
-
-  /*
-  =====================================
-  CARGAR CANCIÓN
-  =====================================
-  */
-
-  async function loadSong(songId) {
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from('songs')
-        .select('*')
-        .eq(
-          'id',
-          songId
-        )
-        .single()
-
-    if (error) {
-      setMessage(
-        error.message
-      )
-
-      return
-    }
-
-    setSong(data)
-
-    if (
-      data?.spotify_id
-    ) {
-      await prepareSpotifySong(
-        data.spotify_id
-      )
-    }
-  }
-
-
-  /*
-  =====================================
-  SPOTIFY
-  =====================================
-  */
-
-  async function prepareSpotifySong(
-    spotifyId
-  ) {
-    stopSpotify()
-
-    setSpotifyReady(false)
-
-    hasPlayedCurrentSongRef.current =
-      false
-
-    const IFrameAPI =
-      iframeApiRef.current ||
-      await loadSpotifyIframeApi()
-
-    iframeApiRef.current =
-      IFrameAPI
-
-    const uri =
-      `spotify:track:${spotifyId}`
-
-    if (
-      controllerRef.current
-    ) {
-      if (
-        loadedSpotifyIdRef.current !==
-        spotifyId
-      ) {
-        loadedSpotifyIdRef.current =
-          spotifyId
-
-        controllerRef.current
-          .loadEntity(uri)
-      }
-
-      /*
-      El controller ya existe.
-      Spotify puede tardar un poco en
-      cambiar la entidad, pero durante
-      los 3 segundos de preparación
-      queda listo.
-      */
-
-      setSpotifyReady(true)
-
-      return
-    }
-
-    const element =
-      document.getElementById(
-        'spotify-room-embed'
-      )
-
-    if (!element) {
-      return
-    }
-
-    IFrameAPI.createController(
-      element,
-      {
-        width: '100%',
-        height: 80,
-        uri
-      },
-      controller => {
-        controllerRef.current =
-          controller
-
-        loadedSpotifyIdRef.current =
-          spotifyId
-
-        setupSpotifyEvents(
-          controller
-        )
-      }
-    )
-  }
-
-
-  function setupSpotifyEvents(
-    controller
-  ) {
-    controller.addListener(
-      'ready',
-      () => {
-        setSpotifyReady(true)
-      }
-    )
-
-    controller.addListener(
-      'playback_started',
-      () => {
-        /*
-        Este evento NO controla el timer.
-
-        El timer se crea directamente
-        cuando el jugador toca Play.
-        */
-
-        setAudioStarting(false)
-
-        setIsPlaying(true)
-      }
-    )
-  }
-
-
-  /*
-  =====================================
-  CORTE DE AUDIO
-  =====================================
-  */
-
-  function stopSpotify() {
-    clearTimeout(
-      stopTimerRef.current
-    )
-
-    const controller =
-      controllerRef.current
-
-    controller?.pause()
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      100
-    )
-
-    setIsPlaying(false)
-
-    setAudioStarting(false)
-
-    stoppingRef.current =
-      false
-  }
-
-
-  function hardStopSpotify() {
-    if (
-      stoppingRef.current
-    ) {
-      return
-    }
-
-    stoppingRef.current =
-      true
-
-    clearTimeout(
-      stopTimerRef.current
-    )
-
-    const controller =
-      controllerRef.current
-
-    controller?.pause()
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      80
-    )
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      180
-    )
-
-    setTimeout(
-      () => {
-        controller?.pause()
-      },
-      350
-    )
-
-    setIsPlaying(false)
-
-    setAudioStarting(false)
-
-    setTimeout(
-      () => {
-        stoppingRef.current =
-          false
-      },
-      450
-    )
-  }
-
-
-  /*
-  =====================================
-  PLAY
-  =====================================
-  */
-
-  function togglePlay() {
-    const controller =
-      controllerRef.current
-
-    if (
-      !controller ||
-      !spotifyReady ||
-      !roundActive ||
-      roundDone
-    ) {
-      return
-    }
-
-    if (
-      isPlaying ||
-      audioStarting
-    ) {
-      hardStopSpotify()
-      return
-    }
-
-    clearTimeout(
-      stopTimerRef.current
-    )
-
-    stoppingRef.current =
-      false
-
-    const durationMs =
-      currentLevel.duration *
-      1000
-
-    setAudioStarting(true)
-
-    setIsPlaying(true)
-
-    /*
-    IMPORTANTE:
-
-    El timer se crea ANTES de pedirle
-    a Spotify que reproduzca.
-
-    Así nunca dependemos de
-    playback_started para cortar.
-    */
-
-    stopTimerRef.current =
-      setTimeout(
-        () => {
-          hardStopSpotify()
-        },
-        durationMs
-      )
-
-    if (
-      hasPlayedCurrentSongRef.current
-    ) {
-      /*
-      restart() ya reinicia/reproduce.
-      NO hacemos restart() + play().
-      */
-
-      controller.restart()
-    } else {
-      hasPlayedCurrentSongRef.current =
-        true
-
-      controller.play()
-    }
-  }
-
-
-  /*
-  =====================================
-  BUSCADOR LOCAL
+  BUSCADOR
   =====================================
   */
 
@@ -1344,27 +1391,30 @@ export default function RoomGamePage() {
     ) {
       setSearchResults([])
 
-      setSearching(false)
+      setSearching(
+        false
+      )
 
       return
     }
 
-    setSearching(true)
+    setSearching(
+      true
+    )
 
     searchTimer.current =
       setTimeout(
         () => {
-          const results =
+          setSearchResults(
             searchLibrary(
               songs,
               query.trim()
             )
-
-          setSearchResults(
-            results
           )
 
-          setSearching(false)
+          setSearching(
+            false
+          )
         },
         90
       )
@@ -1382,7 +1432,9 @@ export default function RoomGamePage() {
   ])
 
 
-  function selectGuess(track) {
+  function selectGuess(
+    track
+  ) {
     skipNextSearchRef.current =
       true
 
@@ -1400,7 +1452,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  FALLO / SALTO
+  FALLO / SALTAR
   =====================================
   */
 
@@ -1414,9 +1466,11 @@ export default function RoomGamePage() {
       return
     }
 
+    const nextWrongCount =
+      wrongCount + 1
+
     setWrongCount(
-      current =>
-        current + 1
+      nextWrongCount
     )
 
     setAttempts(
@@ -1438,9 +1492,12 @@ export default function RoomGamePage() {
 
     setQuery('')
 
-    setSelectedGuess(null)
+    setSelectedGuess(
+      null
+    )
 
     setSearchResults([])
+
 
     if (
       levelIndex <
@@ -1450,10 +1507,25 @@ export default function RoomGamePage() {
         current =>
           current + 1
       )
+
+      setMessage(
+        `−${PENALTY_PER_MISTAKE} pts potenciales`
+      )
+
+      return
     }
 
+
     setMessage(
-      `−${PENALTY_PER_MISTAKE} pts potenciales`
+      'Terminaste tus intentos.'
+    )
+
+
+    finishRound(
+      false,
+      null,
+      false,
+      nextWrongCount
     )
   }
 
@@ -1478,7 +1550,9 @@ export default function RoomGamePage() {
       roundDone ||
       !roundActive
     ) {
-      if (!selectedGuess) {
+      if (
+        !selectedGuess
+      ) {
         setMessage(
           'Selecciona una canción.'
         )
@@ -1495,6 +1569,7 @@ export default function RoomGamePage() {
         selectedGuess
       )
 
+
     if (!correct) {
       registerFailure(
         `${selectedGuess.title} — ${selectedGuess.artist}`
@@ -1502,6 +1577,7 @@ export default function RoomGamePage() {
 
       return
     }
+
 
     setAttempts(
       current => [
@@ -1519,24 +1595,25 @@ export default function RoomGamePage() {
       ]
     )
 
+
     finishRound(
       true,
-      selectedGuess,
-      false
+      selectedGuess
     )
   }
 
 
   /*
   =====================================
-  TERMINAR RONDA
+  TERMINAR
   =====================================
   */
 
   async function finishRound(
     correct,
     guessData = null,
-    timeout = false
+    timeout = false,
+    wrongCountOverride = null
   ) {
     if (
       roundDone &&
@@ -1547,17 +1624,15 @@ export default function RoomGamePage() {
 
     stopSpotify()
 
-    setRoundDone(true)
+    setRoundDone(
+      true
+    )
 
-    if (timeout) {
-      setMessage(
-        'Se acabó el tiempo.'
-      )
-    } else if (correct) {
-      setMessage(
-        '¡Correcto!'
-      )
-    }
+
+    const finalWrongCount =
+      wrongCountOverride ??
+      wrongCount
+
 
     try {
       const {
@@ -1596,26 +1671,31 @@ export default function RoomGamePage() {
                 currentLevel.label,
 
               p_wrong_count:
-                wrongCount
+                finalWrongCount
             }
           )
+
 
       if (error) {
         throw error
       }
+
 
       const result =
         Array.isArray(data)
           ? data[0]
           : data
 
+
       const awarded =
         result?.awarded_points ||
         0
 
+
       const position =
         result?.correct_position ||
         0
+
 
       setRoundPoints(
         awarded
@@ -1625,13 +1705,25 @@ export default function RoomGamePage() {
         position
       )
 
-      if (correct) {
+
+      if (timeout) {
         setMessage(
-          position > 0
-            ? `¡Correcto! #${position} · +${awarded} pts`
-            : `¡Correcto! +${awarded} pts`
+          'Se acabó el tiempo.'
+        )
+
+      } else if (
+        correct
+      ) {
+        setMessage(
+          `¡Correcto! #${position} · +${awarded} pts`
+        )
+
+      } else {
+        setMessage(
+          'Terminaste tus intentos.'
         )
       }
+
 
       await Promise.all([
         loadAnswers(
@@ -1644,12 +1736,15 @@ export default function RoomGamePage() {
           room.id
         )
       ])
+
     } catch (error) {
-      console.error(error)
+      console.error(
+        error
+      )
 
       setMessage(
         error.message ||
-        'No se pudo registrar tu respuesta.'
+        'No se pudo registrar la respuesta.'
       )
     }
   }
@@ -1657,28 +1752,40 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  RESET DE RONDA
+  RESET
   =====================================
   */
 
   function resetRound() {
     stopSpotify()
 
-    setLevelIndex(0)
+    setLevelIndex(
+      0
+    )
 
     setAttempts([])
 
-    setWrongCount(0)
+    setWrongCount(
+      0
+    )
 
-    setRoundDone(false)
+    setRoundDone(
+      false
+    )
 
-    setRoundPoints(0)
+    setRoundPoints(
+      0
+    )
 
-    setCorrectPosition(0)
+    setCorrectPosition(
+      0
+    )
 
     setQuery('')
 
-    setSelectedGuess(null)
+    setSelectedGuess(
+      null
+    )
 
     setSearchResults([])
 
@@ -1692,16 +1799,19 @@ export default function RoomGamePage() {
       PREPARE_SECONDS
     )
 
-    setRoundActive(false)
+    setRoundActive(
+      false
+    )
 
-    setRoundExpired(false)
+    setRoundExpired(
+      false
+    )
 
-    setSpotifyReady(false)
+    setSpotifyReady(
+      false
+    )
 
     timeoutSubmittedRef.current =
-      false
-
-    hasPlayedCurrentSongRef.current =
       false
   }
 
@@ -1720,6 +1830,7 @@ export default function RoomGamePage() {
     }
 
     stopSpotify()
+
 
     if (
       room.current_round >=
@@ -1745,15 +1856,19 @@ export default function RoomGamePage() {
       return
     }
 
-    const usable =
+
+    const candidates =
       songs.filter(
         item =>
-          Boolean(
-            item.spotify_id
-          )
+          item.spotify_id &&
+          item.id !==
+            room.current_song_id
       )
 
-    if (!usable.length) {
+
+    if (
+      !candidates.length
+    ) {
       setMessage(
         'No hay canciones disponibles.'
       )
@@ -1761,17 +1876,6 @@ export default function RoomGamePage() {
       return
     }
 
-    let candidates =
-      usable.filter(
-        item =>
-          item.id !==
-          room.current_song_id
-      )
-
-    if (!candidates.length) {
-      candidates =
-        usable
-    }
 
     const nextSong =
       candidates[
@@ -1781,6 +1885,11 @@ export default function RoomGamePage() {
         )
       ]
 
+
+    const clipStart =
+      generateClipStart()
+
+
     const startAt =
       new Date(
         Date.now() +
@@ -1788,6 +1897,7 @@ export default function RoomGamePage() {
           1000
       )
         .toISOString()
+
 
     const {
       error
@@ -1802,12 +1912,16 @@ export default function RoomGamePage() {
             nextSong.id,
 
           round_started_at:
-            startAt
+            startAt,
+
+          clip_start:
+            clipStart
         })
         .eq(
           'id',
           room.id
         )
+
 
     if (error) {
       setMessage(
@@ -1846,15 +1960,35 @@ export default function RoomGamePage() {
       players.length
 
 
+  const effectiveRoundActive =
+    roundActive &&
+    !everyoneFinished
+
+
   const hostCanContinue =
     everyoneFinished ||
     roundExpired ||
     timeLeft <= 0
 
 
+  useEffect(() => {
+    if (
+      everyoneFinished
+    ) {
+      stopSpotify()
+
+      setRoundActive(
+        false
+      )
+    }
+  }, [
+    everyoneFinished
+  ])
+
+
   /*
   =====================================
-  PARTIDA FINALIZADA
+  FINAL
   =====================================
   */
 
@@ -1869,6 +2003,7 @@ export default function RoomGamePage() {
             b.score -
             a.score
         )
+
 
     return (
       <section className="room-game-wrap">
@@ -1936,36 +2071,8 @@ export default function RoomGamePage() {
                 )
             }
           >
-
             Volver a salas
-
           </button>
-
-        </div>
-
-      </section>
-    )
-  }
-
-
-  /*
-  =====================================
-  CARGANDO
-  =====================================
-  */
-
-  if (
-    !room ||
-    !song ||
-    !player
-  ) {
-    return (
-      <section className="room-game-wrap">
-
-        <div className="notice">
-
-          {message ||
-            'Cargando partida...'}
 
         </div>
 
@@ -1993,330 +2100,437 @@ export default function RoomGamePage() {
       </div>
 
 
-      <div className="room-game-top">
+      {(
+        !room ||
+        !song ||
+        !player
+      ) ? (
 
-        <div>
+        <div className="notice">
 
-          <span className="room-eyebrow">
-
-            Sala {room.code}
-
-          </span>
-
-          <h2>
-
-            Ronda {room.current_round}
-            {' '}
-            de
-            {' '}
-            {room.total_rounds}
-
-          </h2>
+          {message ||
+            'Cargando partida...'}
 
         </div>
 
-
-        <div className="room-score-mini">
-
-          <Trophy size={18} />
-
-          {
-            players.find(
-              item =>
-                item.id ===
-                player.player_id
-            )?.score || 0
-          }
-
-          pts
-
-        </div>
-
-      </div>
-
-
-      <div
-        className={
-          `room-round-timer ${
-            timeLeft <= 10 &&
-            roundActive
-              ? 'danger'
-              : ''
-          }`
-        }
-      >
-
-        <Clock3 size={22} />
-
-        {preparationLeft > 0 ? (
-
-          <>
-
-            Preparando ronda
-            {' '}
-            {preparationLeft}...
-
-          </>
-
-        ) : (
-
-          formatTime(
-            timeLeft
-          )
-
-        )}
-
-      </div>
-
-
-      {preparationLeft > 0 &&
-        !roundDone && (
-
-        <div className="room-preparing-card">
-
-          <LoaderCircle
-            className="room-spin"
-            size={34}
-          />
-
-          <strong>
-            Preparando canción...
-          </strong>
-
-          <span>
-            La ronda comenzará para todos al mismo tiempo.
-          </span>
-
-        </div>
-
-      )}
-
-
-      {!roundDone &&
-        preparationLeft === 0 && (
+      ) : (
 
         <>
 
-          <div className="room-level-card">
+          <div className="room-game-top">
 
-            <span>
-              NIVEL ACTUAL
-            </span>
+            <div>
 
-            <strong>
-              {currentLevel.label}
-            </strong>
+              <span className="room-eyebrow">
 
-            <small>
+                Sala {room.code}
 
-              {currentLevel.duration}
-              s de canción
+              </span>
 
-            </small>
+              <h2>
 
-          </div>
-
-
-          <div className="difficulty-row">
-
-            {LEVELS.map(
-              (
-                level,
-                index
-              ) => (
-
-                <div
-                  key={level.id}
-                  className={
-                    `level-pill ${level.id} ${
-                      index === levelIndex
-                        ? 'current'
-                        : ''
-                    } ${
-                      index < levelIndex
-                        ? 'used'
-                        : ''
-                    }`
-                  }
-                >
-
-                  {level.label}
-
-                  <small>
-                    {level.duration}s
-                  </small>
-
-                </div>
-
-              )
-            )}
-
-          </div>
-
-
-          <div className="room-potential-score">
-
-            <strong>
-              {potentialPoints} pts
-            </strong>
-
-            <span>
-              potenciales
-            </span>
-
-
-            {wrongCount > 0 && (
-
-              <em>
-
-                {wrongCount}
+                Ronda {room.current_round}
                 {' '}
-                {wrongCount === 1
-                  ? 'fallo'
-                  : 'fallos'}
-
-                {' · '}
-
-                −
-                {wrongCount *
-                  PENALTY_PER_MISTAKE}
+                de
                 {' '}
-                pts
+                {room.total_rounds}
 
-              </em>
+              </h2>
 
-            )}
+            </div>
+
+
+            <div className="room-score-mini">
+
+              <Trophy size={18} />
+
+              {
+                players.find(
+                  item =>
+                    item.id ===
+                    player.player_id
+                )?.score || 0
+              }
+
+              pts
+
+            </div>
 
           </div>
 
 
-          <button
+          <div
             className={
-              `play-button ${
-                audioStarting
-                  ? 'audio-starting'
+              `room-round-timer ${
+                timeLeft <= 10 &&
+                effectiveRoundActive
+                  ? 'danger'
                   : ''
               }`
             }
-            onClick={togglePlay}
-            disabled={
-              !spotifyReady ||
-              !roundActive
-            }
           >
 
-            {isPlaying ? (
+            <Clock3 size={22} />
 
-              <Pause
-                size={58}
-                fill="currentColor"
-              />
-
-            ) : (
-
-              <Play
-                size={58}
-                fill="currentColor"
-              />
-
-            )}
-
-          </button>
-
-
-          <div className="seconds">
-
-            {!spotifyReady
-              ? 'Preparando audio...'
-              : `${currentLevel.duration}s`}
+            {preparationLeft > 0
+              ? `Preparando ronda ${preparationLeft}...`
+              : formatTime(
+                  timeLeft
+                )}
 
           </div>
 
 
-          <div className="guess-area">
+          {preparationLeft > 0 &&
+            !roundDone && (
 
-            <div className="autocomplete">
+            <div className="room-preparing-card">
 
-              <div className="spotify-game-search">
+              <LoaderCircle
+                className="room-spin"
+                size={34}
+              />
 
-                <Search size={20} />
+              <strong>
+                Preparando canción...
+              </strong>
 
-                <input
-                  value={query}
-                  placeholder="Busca una canción..."
-                  disabled={
-                    !roundActive
-                  }
-                  onChange={
-                    e => {
-                      setQuery(
-                        e.target.value
-                      )
+            </div>
 
-                      setSelectedGuess(
-                        null
-                      )
-                    }
-                  }
-                />
+          )}
+
+
+          {!roundDone &&
+            preparationLeft === 0 && (
+
+            <>
+
+              <div className="room-level-card">
+
+                <span>
+                  NIVEL ACTUAL
+                </span>
+
+                <strong>
+                  {currentLevel.label}
+                </strong>
+
+                <small>
+                  {currentLevel.duration}s de canción
+                </small>
 
               </div>
 
 
-              {searching && (
+              <div className="difficulty-row">
 
-                <div className="spotify-searching">
+                {LEVELS.map(
+                  (
+                    level,
+                    index
+                  ) => (
 
-                  Buscando canciones...
+                    <div
+                      key={level.id}
+                      className={
+                        `level-pill ${level.id} ${
+                          index ===
+                          levelIndex
+                            ? 'current'
+                            : ''
+                        } ${
+                          index <
+                          levelIndex
+                            ? 'used'
+                            : ''
+                        }`
+                      }
+                    >
 
+                      {level.label}
+
+                      <small>
+                        {level.duration}s
+                      </small>
+
+                    </div>
+
+                  )
+                )}
+
+              </div>
+
+
+              <div className="room-potential-score">
+
+                <strong>
+                  {potentialPoints} pts
+                </strong>
+
+                <span>
+                  potenciales
+                </span>
+
+
+                {wrongCount > 0 && (
+
+                  <em>
+
+                    {wrongCount}
+                    {' '}
+
+                    {wrongCount === 1
+                      ? 'fallo'
+                      : 'fallos'}
+
+                    {' · −'}
+
+                    {wrongCount *
+                      PENALTY_PER_MISTAKE}
+
+                    {' pts'}
+
+                  </em>
+
+                )}
+
+              </div>
+
+
+              <button
+                className={
+                  `play-button ${
+                    audioStarting
+                      ? 'audio-starting'
+                      : ''
+                  }`
+                }
+                onClick={
+                  togglePlay
+                }
+                disabled={
+                  !spotifyReady ||
+                  !effectiveRoundActive
+                }
+              >
+
+                {isPlaying ? (
+
+                  <Pause
+                    size={58}
+                    fill="currentColor"
+                  />
+
+                ) : (
+
+                  <Play
+                    size={58}
+                    fill="currentColor"
+                  />
+
+                )}
+
+              </button>
+
+
+              <div className="seconds">
+
+                {!spotifyReady
+                  ? 'Preparando audio...'
+                  : `${currentLevel.duration}s`}
+
+              </div>
+
+
+              <div className="guess-area">
+
+                <div className="autocomplete">
+
+                  <div className="spotify-game-search">
+
+                    <Search size={20} />
+
+                    <input
+                      value={
+                        query
+                      }
+                      placeholder="Busca una canción..."
+                      disabled={
+                        !effectiveRoundActive
+                      }
+                      onChange={
+                        event => {
+                          setQuery(
+                            event.target.value
+                          )
+
+                          setSelectedGuess(
+                            null
+                          )
+                        }
+                      }
+                    />
+
+                  </div>
+
+
+                  {searching && (
+
+                    <div className="spotify-searching">
+                      Buscando canciones...
+                    </div>
+
+                  )}
+
+
+                  {searchResults.length > 0 && (
+
+                    <div className="suggestions spotify-game-results">
+
+                      {searchResults.map(
+                        track => (
+
+                          <button
+                            key={
+                              track.id
+                            }
+                            type="button"
+                            onClick={
+                              () =>
+                                selectGuess(
+                                  track
+                                )
+                            }
+                          >
+
+                            {track.album_image_url && (
+
+                              <img
+                                src={
+                                  track.album_image_url
+                                }
+                                alt=""
+                              />
+
+                            )}
+
+
+                            <span className="guess-track-info">
+
+                              <b>
+                                {track.title}
+                              </b>
+
+                              <small>
+                                {track.artist}
+                              </small>
+
+                            </span>
+
+                          </button>
+
+                        )
+                      )}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+
+                <div className="guess-actions">
+
+                  <button
+                    className="guess-btn"
+                    onClick={
+                      guess
+                    }
+                    disabled={
+                      !effectiveRoundActive
+                    }
+                  >
+                    Adivinar
+                  </button>
+
+
+                  <button
+                    className="skip-inline-btn"
+                    onClick={
+                      skip
+                    }
+                    disabled={
+                      !effectiveRoundActive
+                    }
+                  >
+
+                    <SkipForward />
+
+                    Saltar
+
+                  </button>
+
+                </div>
+
+              </div>
+
+
+              {message && (
+
+                <div className="message">
+                  {message}
                 </div>
 
               )}
 
 
-              {searchResults.length > 0 && (
+              {attempts.length > 0 && (
 
-                <div className="suggestions spotify-game-results">
+                <div className="attempt-history">
 
-                  {searchResults.map(
-                    track => (
+                  <h3>
+                    Tus intentos
+                  </h3>
 
-                      <button
-                        type="button"
-                        key={track.id}
-                        onClick={
-                          () =>
-                            selectGuess(
-                              track
-                            )
+
+                  {attempts.map(
+                    (
+                      item,
+                      index
+                    ) => (
+
+                      <div
+                        className={
+                          `attempt-row ${
+                            item.correct
+                              ? 'correct'
+                              : ''
+                          }`
+                        }
+                        key={
+                          index
                         }
                       >
 
-                        {track.album_image_url && (
+                        <span className="attempt-number">
 
-                          <img
-                            src={
-                              track.album_image_url
-                            }
-                            alt=""
-                          />
-
-                        )}
-
-
-                        <span className="guess-track-info">
-
-                          <b>
-                            {track.title}
-                          </b>
-
-                          <small>
-                            {track.artist}
-                          </small>
+                          {item.correct
+                            ? '✓'
+                            : '✕'}
 
                         </span>
 
-                      </button>
+
+                        <strong>
+                          {item.level}
+                        </strong>
+
+
+                        <span className="attempt-answer">
+                          {item.text}
+                        </span>
+
+                      </div>
 
                     )
                   )}
@@ -2325,387 +2539,280 @@ export default function RoomGamePage() {
 
               )}
 
-            </div>
+            </>
+
+          )}
 
 
-            <div className="guess-actions">
+          {roundDone && (
 
-              <button
-                className="guess-btn"
-                onClick={guess}
-                disabled={
-                  !roundActive
-                }
-              >
+            <div className="round-result-card">
 
-                Adivinar
+              {song.album_image_url && (
 
-              </button>
+                <img
+                  src={
+                    song.album_image_url
+                  }
+                  alt=""
+                />
 
-
-              <button
-                className="skip-inline-btn"
-                onClick={skip}
-                disabled={
-                  !roundActive
-                }
-              >
-
-                <SkipForward />
-
-                Saltar
-
-              </button>
-
-            </div>
-
-          </div>
+              )}
 
 
-          {message && (
+              {roundPoints > 0 ? (
 
-            <div className="message">
+                <>
 
-              {message}
+                  <CheckCircle2
+                    size={31}
+                  />
+
+                  <span>
+                    ¡La pegaste!
+                  </span>
+
+                  <h2>
+                    {song.title}
+                  </h2>
+
+                  <p>
+                    {song.artist}
+                  </p>
+
+                  <strong className="round-earned">
+
+                    +{roundPoints} pts
+
+                  </strong>
+
+
+                  {correctPosition > 0 && (
+
+                    <div className="room-finish-position">
+
+                      Fuiste
+                      {' '}
+
+                      <strong>
+                        #{correctPosition}
+                      </strong>
+
+                      {' en acertarla · '}
+
+                      {getPositionMultiplier(
+                        correctPosition
+                      )}
+
+                      %
+
+                    </div>
+
+                  )}
+
+                </>
+
+              ) : (
+
+                <>
+
+                  <X size={31} />
+
+                  <span>
+                    Sin puntos
+                  </span>
+
+                  <h2>
+                    {song.title}
+                  </h2>
+
+                  <p>
+                    {song.artist}
+                  </p>
+
+                </>
+
+              )}
+
+
+              <div className="round-waiting">
+
+                {answers.length}
+                {' de '}
+                {players.length}
+                {' terminaron'}
+
+              </div>
+
+
+              {player.is_host ? (
+
+                <button
+                  className="primary room-next-round-btn"
+                  disabled={
+                    !hostCanContinue
+                  }
+                  onClick={
+                    nextRound
+                  }
+                >
+
+                  <ArrowRight />
+
+                  {
+                    room.current_round >=
+                    room.total_rounds
+                      ? 'Ver resultados'
+                      : hostCanContinue
+                        ? 'Siguiente ronda'
+                        : `Esperando jugadores (${answers.length}/${players.length})`
+                  }
+
+                </button>
+
+              ) : (
+
+                <p className="muted">
+
+                  {hostCanContinue
+                    ? 'Esperando que el host continúe...'
+                    : 'Esperando a los demás jugadores...'}
+
+                </p>
+
+              )}
 
             </div>
 
           )}
 
 
-          {attempts.length > 0 && (
+          <div className="room-correct-list">
 
-            <div className="attempt-history">
-
-              <h3>
-                Tus intentos
-              </h3>
+            <h3>
+              ⚡ Acertaron esta ronda
+            </h3>
 
 
-              {attempts.map(
+            {!correctAnswers.length && (
+
+              <p className="muted">
+
+                Todavía nadie la ha adivinado.
+
+              </p>
+
+            )}
+
+
+            {correctAnswers.map(
+              (
+                answer,
+                index
+              ) => {
+                const answerPlayer =
+                  players.find(
+                    item =>
+                      item.id ===
+                      answer.player_id
+                  )
+
+                return (
+
+                  <div
+                    className="room-correct-row"
+                    key={
+                      answer.id
+                    }
+                  >
+
+                    <span>
+
+                      {index === 0
+                        ? '🥇'
+                        : index === 1
+                          ? '🥈'
+                          : index === 2
+                            ? '🥉'
+                            : `#${index + 1}`}
+
+                    </span>
+
+
+                    <strong>
+
+                      {answerPlayer
+                        ?.player_name ||
+                        'Jugador'}
+
+                    </strong>
+
+
+                    <b>
+                      +{answer.points} pts
+                    </b>
+
+                  </div>
+
+                )
+              }
+            )}
+
+          </div>
+
+
+          <div className="live-scoreboard">
+
+            <h3>
+
+              <Trophy size={19} />
+
+              Marcador general
+
+            </h3>
+
+
+            {[...players]
+              .sort(
+                (a, b) =>
+                  b.score -
+                  a.score
+              )
+              .map(
                 (
                   item,
                   index
                 ) => (
 
                   <div
-                    className={
-                      `attempt-row ${
-                        item.correct
-                          ? 'correct'
-                          : ''
-                      }`
+                    className="live-score-row"
+                    key={
+                      item.id
                     }
-                    key={index}
                   >
 
-                    <span className="attempt-number">
-
-                      {item.correct
-                        ? '✓'
-                        : '✕'}
-
+                    <span>
+                      #{index + 1}
                     </span>
 
                     <strong>
-                      {item.level}
+                      {item.player_name}
                     </strong>
 
-                    <span className="attempt-answer">
-
-                      {item.text}
-
-                    </span>
+                    <b>
+                      {item.score} pts
+                    </b>
 
                   </div>
 
                 )
               )}
 
-            </div>
-
-          )}
+          </div>
 
         </>
 
       )}
-
-
-      {roundDone && (
-
-        <div className="round-result-card">
-
-          {song.album_image_url && (
-
-            <img
-              src={
-                song.album_image_url
-              }
-              alt=""
-            />
-
-          )}
-
-
-          {roundPoints > 0 ? (
-
-            <>
-
-              <CheckCircle2
-                size={31}
-              />
-
-              <span>
-                ¡La pegaste!
-              </span>
-
-
-              <h2>
-                {song.title}
-              </h2>
-
-              <p>
-                {song.artist}
-              </p>
-
-
-              <strong className="round-earned">
-
-                +{roundPoints} pts
-
-              </strong>
-
-
-              {correctPosition > 0 && (
-
-                <div className="room-finish-position">
-
-                  Fuiste
-                  {' '}
-
-                  <strong>
-                    #{correctPosition}
-                  </strong>
-
-                  {' '}
-
-                  en acertarla ·
-                  {' '}
-
-                  {getPositionMultiplier(
-                    correctPosition
-                  )}
-                  %
-
-                </div>
-
-              )}
-
-            </>
-
-          ) : (
-
-            <>
-
-              <X size={31} />
-
-              <span>
-
-                {roundExpired
-                  ? 'Se acabó el tiempo'
-                  : 'No hubo puntos'}
-
-              </span>
-
-              <h2>
-                {song.title}
-              </h2>
-
-              <p>
-                {song.artist}
-              </p>
-
-            </>
-
-          )}
-
-
-          <div className="round-waiting">
-
-            {answers.length}
-            {' '}
-            de
-            {' '}
-            {players.length}
-            {' '}
-            terminaron
-
-          </div>
-
-
-          {player.is_host ? (
-
-            <button
-              className="primary room-next-round-btn"
-              disabled={
-                !hostCanContinue
-              }
-              onClick={nextRound}
-            >
-
-              <ArrowRight />
-
-              {
-                room.current_round >=
-                room.total_rounds
-
-                  ? 'Ver resultados'
-
-                  : hostCanContinue
-
-                    ? 'Siguiente ronda'
-
-                    : `Esperando jugadores (${answers.length}/${players.length})`
-              }
-
-            </button>
-
-          ) : (
-
-            <p className="muted">
-
-              {hostCanContinue
-                ? 'Esperando que el host continúe...'
-                : 'Esperando a los demás jugadores...'}
-
-            </p>
-
-          )}
-
-        </div>
-
-      )}
-
-
-      <div className="room-correct-list">
-
-        <h3>
-          ⚡ Acertaron esta ronda
-        </h3>
-
-
-        {!correctAnswers.length && (
-
-          <p className="muted">
-
-            Todavía nadie la ha adivinado.
-
-          </p>
-
-        )}
-
-
-        {correctAnswers.map(
-          (
-            answer,
-            index
-          ) => {
-            const answerPlayer =
-              players.find(
-                item =>
-                  item.id ===
-                  answer.player_id
-              )
-
-            return (
-
-              <div
-                className="room-correct-row"
-                key={answer.id}
-              >
-
-                <span>
-
-                  {index === 0
-                    ? '🥇'
-                    : index === 1
-                      ? '🥈'
-                      : index === 2
-                        ? '🥉'
-                        : `#${index + 1}`}
-
-                </span>
-
-
-                <strong>
-
-                  {answerPlayer
-                    ?.player_name ||
-                    'Jugador'}
-
-                </strong>
-
-
-                <b>
-
-                  +{answer.points} pts
-
-                </b>
-
-              </div>
-            )
-          }
-        )}
-
-      </div>
-
-
-      <div className="live-scoreboard">
-
-        <h3>
-
-          <Trophy size={19} />
-
-          Marcador general
-
-        </h3>
-
-
-        {[...players]
-          .sort(
-            (a, b) =>
-              b.score -
-              a.score
-          )
-          .map(
-            (
-              item,
-              index
-            ) => (
-
-              <div
-                className="live-score-row"
-                key={item.id}
-              >
-
-                <span>
-                  #{index + 1}
-                </span>
-
-                <strong>
-                  {item.player_name}
-                </strong>
-
-                <b>
-                  {item.score} pts
-                </b>
-
-              </div>
-
-            )
-          )}
-
-      </div>
 
     </section>
   )
