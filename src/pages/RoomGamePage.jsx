@@ -994,95 +994,73 @@ export default function RoomGamePage() {
   */
 
   function togglePlay() {
-    const controller =
-      controllerRef.current
+  const controller =
+    controllerRef.current
 
-    if (
-      !controller ||
-      !spotifyReady ||
-      !roundActive ||
-      roundDone
-    ) {
-      return
-    }
+  if (
+    !controller ||
+    !spotifyReady ||
+    !roundActive ||
+    roundDone
+  ) {
+    return
+  }
 
-    if (
-      isPlaying ||
-      audioStarting
-    ) {
-      hardStopSpotify()
+  if (
+    isPlaying ||
+    audioStarting
+  ) {
+    hardStopSpotify()
+    return
+  }
 
-      return
-    }
+  clearTimeout(
+    stopTimerRef.current
+  )
 
-    clearTimeout(
-      stopTimerRef.current
+  stoppingRef.current =
+    false
+
+  const durationMs =
+    currentLevel.duration *
+    1000
+
+  const sharedStart =
+    Number(
+      room?.clip_start ||
+      0
     )
 
-    stoppingRef.current =
-      false
+  /*
+  IMPORTANTE EN MÓVIL:
 
+  seek + play ocurren directamente
+  dentro del click del usuario.
+  No usamos setTimeout para play().
+  */
 
-    const durationMs =
-      currentLevel.duration *
-      1000
+  controller.seek(
+    sharedStart
+  )
 
+  controller.play()
 
-    const sharedStart =
-      Number(
-        room?.clip_start ||
-        0
-      )
+  setAudioStarting(
+    true
+  )
 
+  setIsPlaying(
+    true
+  )
 
-    /*
-    Todos reciben el mismo clip_start.
-    Antes de cada reproducción
-    buscamos ese punto exacto.
-    */
-
-    controller.seek(
-      sharedStart
-    )
-
-
-    setAudioStarting(
-      true
-    )
-
-    setIsPlaying(
-      true
-    )
-
-
-    /*
-    Pequeñísimo margen para que el seek
-    se aplique antes de reproducir.
-    */
-
+  stopTimerRef.current =
     setTimeout(
       () => {
-        controller.play()
+        hardStopSpotify()
       },
-      120
+      durationMs
     )
-
-
-    /*
-    Cortamos el fragmento.
-    Sumamos los mismos 120 ms usados
-    para el seek para que el tiempo
-    audible siga siendo el del nivel.
-    */
-
-    stopTimerRef.current =
-      setTimeout(
-        () => {
-          hardStopSpotify()
-        },
-        durationMs + 120
-      )
-  }
+}
 
 
   /*
