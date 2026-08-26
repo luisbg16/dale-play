@@ -256,6 +256,12 @@ export default function RoomGamePage() {
     useNavigate()
 
 
+  /*
+  =====================================
+  SALA
+  =====================================
+  */
+
   const [room, setRoom] =
     useState(null)
 
@@ -274,6 +280,12 @@ export default function RoomGamePage() {
   const [answers, setAnswers] =
     useState([])
 
+
+  /*
+  =====================================
+  RONDA
+  =====================================
+  */
 
   const [levelIndex, setLevelIndex] =
     useState(0)
@@ -296,6 +308,12 @@ export default function RoomGamePage() {
   ] = useState(0)
 
 
+  /*
+  =====================================
+  TIEMPO
+  =====================================
+  */
+
   const [timeLeft, setTimeLeft] =
     useState(ROUND_SECONDS)
 
@@ -317,6 +335,12 @@ export default function RoomGamePage() {
   const timeoutSubmittedRef =
     useRef(false)
 
+
+  /*
+  =====================================
+  BUSCADOR
+  =====================================
+  */
 
   const [query, setQuery] =
     useState('')
@@ -354,6 +378,12 @@ export default function RoomGamePage() {
 
   const controllerRef =
     useRef(null)
+
+  const loadedSpotifyIdRef =
+    useRef(null)
+
+  const hasPlayedCurrentSongRef =
+    useRef(false)
 
   const stopTimerRef =
     useRef(null)
@@ -453,6 +483,7 @@ export default function RoomGamePage() {
         )
         .single()
 
+
     if (
       error ||
       !roomData
@@ -464,10 +495,12 @@ export default function RoomGamePage() {
       return
     }
 
+
     const session =
       sessionStorage.getItem(
         `daleplay-room-${code}`
       )
+
 
     if (!session) {
       setMessage(
@@ -477,11 +510,14 @@ export default function RoomGamePage() {
       return
     }
 
+
     let playerSession
+
 
     try {
       playerSession =
         JSON.parse(session)
+
     } catch {
       setMessage(
         'No pude recuperar tu sesión.'
@@ -490,6 +526,7 @@ export default function RoomGamePage() {
       return
     }
 
+
     setPlayer(
       playerSession
     )
@@ -497,6 +534,7 @@ export default function RoomGamePage() {
     setRoom(
       roomData
     )
+
 
     await Promise.all([
       loadPlayers(
@@ -512,6 +550,7 @@ export default function RoomGamePage() {
       )
     ])
 
+
     if (
       roomData.current_song_id
     ) {
@@ -524,7 +563,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  DATOS
+  CANCIONES
   =====================================
   */
 
@@ -543,10 +582,13 @@ export default function RoomGamePage() {
           true
         )
 
+
     if (error) {
       console.error(error)
+
       return
     }
+
 
     setSongs(
       (data || [])
@@ -560,9 +602,7 @@ export default function RoomGamePage() {
   }
 
 
-  async function loadSong(
-    songId
-  ) {
+  async function loadSong(songId) {
     const {
       data,
       error
@@ -576,6 +616,7 @@ export default function RoomGamePage() {
         )
         .single()
 
+
     if (error) {
       setMessage(
         error.message
@@ -584,15 +625,18 @@ export default function RoomGamePage() {
       return
     }
 
-    setSong(
-      data
-    )
+
+    setSong(data)
   }
 
 
-  async function loadPlayers(
-    roomId
-  ) {
+  /*
+  =====================================
+  JUGADORES
+  =====================================
+  */
+
+  async function loadPlayers(roomId) {
     const {
       data,
       error
@@ -611,16 +655,25 @@ export default function RoomGamePage() {
           }
         )
 
+
     if (error) {
       console.error(error)
+
       return
     }
+
 
     setPlayers(
       data || []
     )
   }
 
+
+  /*
+  =====================================
+  RESPUESTAS
+  =====================================
+  */
 
   async function loadAnswers(
     roomId,
@@ -629,8 +682,10 @@ export default function RoomGamePage() {
   ) {
     if (!roundNumber) {
       setAnswers([])
+
       return
     }
+
 
     const {
       data,
@@ -654,17 +709,20 @@ export default function RoomGamePage() {
           }
         )
 
+
     if (error) {
       console.error(error)
+
       return
     }
+
 
     const list =
       data || []
 
-    setAnswers(
-      list
-    )
+
+    setAnswers(list)
+
 
     if (
       currentPlayerId
@@ -676,9 +734,8 @@ export default function RoomGamePage() {
             currentPlayerId
         )
 
-      if (
-        ownAnswer
-      ) {
+
+      if (ownAnswer) {
         setRoundDone(
           true
         )
@@ -687,6 +744,7 @@ export default function RoomGamePage() {
           ownAnswer.points || 0
         )
 
+
         if (
           ownAnswer.correct
         ) {
@@ -694,6 +752,7 @@ export default function RoomGamePage() {
             new Date(
               ownAnswer.created_at
             ).getTime()
+
 
           const previous =
             list.filter(
@@ -704,6 +763,7 @@ export default function RoomGamePage() {
                 ).getTime() <=
                   ownTime
             )
+
 
           setCorrectPosition(
             previous.length
@@ -723,6 +783,15 @@ export default function RoomGamePage() {
   =====================================
   PREPARAR SPOTIFY
   =====================================
+
+  IMPORTANTE:
+
+  Ya NO hacemos seek().
+  Ya NO usamos clip_start para mover
+  el audio.
+
+  Usamos la misma estrategia del
+  GamePage normal.
   */
 
   useEffect(() => {
@@ -734,9 +803,11 @@ export default function RoomGamePage() {
       return
     }
 
+
     clearTimeout(
       spotifyLoadTimerRef.current
     )
+
 
     spotifyLoadTimerRef.current =
       setTimeout(
@@ -748,6 +819,7 @@ export default function RoomGamePage() {
         50
       )
 
+
     return () => {
       clearTimeout(
         spotifyLoadTimerRef.current
@@ -756,7 +828,6 @@ export default function RoomGamePage() {
   }, [
     song?.spotify_id,
     room?.id,
-    room?.clip_start,
     player?.player_id
   ])
 
@@ -770,37 +841,55 @@ export default function RoomGamePage() {
       false
     )
 
+
+    hasPlayedCurrentSongRef.current =
+      false
+
+
     try {
       const IFrameAPI =
         iframeApiRef.current ||
         await loadSpotifyIframeApi()
 
+
       iframeApiRef.current =
         IFrameAPI
+
 
       const uri =
         `spotify:track:${spotifyId}`
 
-      const sharedStart =
-        Number(
-          room?.clip_start ||
-          0
-        )
-
 
       /*
-      CONTROLLER EXISTENTE
+      ---------------------------------
+      YA EXISTE CONTROLLER
+      ---------------------------------
       */
 
       if (
         controllerRef.current
       ) {
-        controllerRef.current
-          .loadEntity(
-            uri,
-            false,
-            sharedStart
-          )
+        if (
+          loadedSpotifyIdRef.current !==
+          spotifyId
+        ) {
+          loadedSpotifyIdRef.current =
+            spotifyId
+
+
+          controllerRef.current
+            .loadEntity(
+              uri
+            )
+        }
+
+
+        /*
+        Como Spotify no nos da un
+        evento perfecto por cada
+        loadEntity, usamos el tiempo
+        de preparación de la ronda.
+        */
 
         setTimeout(
           () => {
@@ -808,15 +897,18 @@ export default function RoomGamePage() {
               true
             )
           },
-          600
+          500
         )
+
 
         return
       }
 
 
       /*
+      ---------------------------------
       PRIMER CONTROLLER
+      ---------------------------------
       */
 
       const element =
@@ -824,7 +916,12 @@ export default function RoomGamePage() {
           'spotify-room-embed'
         )
 
+
       if (!element) {
+        console.warn(
+          'Spotify embed todavía no está montado.'
+        )
+
         return
       }
 
@@ -840,23 +937,24 @@ export default function RoomGamePage() {
           controllerRef.current =
             controller
 
+
+          loadedSpotifyIdRef.current =
+            spotifyId
+
+
           setupSpotifyEvents(
             controller
-          )
-
-          controller.loadEntity(
-            uri,
-            false,
-            sharedStart
           )
         }
       )
 
+
     } catch (error) {
       console.error(
-        'Spotify:',
+        'Error preparando Spotify:',
         error
       )
+
 
       setMessage(
         'No se pudo preparar el audio.'
@@ -877,9 +975,17 @@ export default function RoomGamePage() {
       }
     )
 
+
     controller.addListener(
       'playback_started',
       () => {
+        /*
+        Este evento NO controla
+        el corte del fragmento.
+
+        Solo actualiza la interfaz.
+        */
+
         setAudioStarting(
           false
         )
@@ -903,10 +1009,13 @@ export default function RoomGamePage() {
       stopTimerRef.current
     )
 
+
     const controller =
       controllerRef.current
 
+
     controller?.pause()
+
 
     setTimeout(
       () => {
@@ -915,6 +1024,7 @@ export default function RoomGamePage() {
       100
     )
 
+
     setIsPlaying(
       false
     )
@@ -922,6 +1032,7 @@ export default function RoomGamePage() {
     setAudioStarting(
       false
     )
+
 
     stoppingRef.current =
       false
@@ -935,17 +1046,22 @@ export default function RoomGamePage() {
       return
     }
 
+
     stoppingRef.current =
       true
+
 
     clearTimeout(
       stopTimerRef.current
     )
 
+
     const controller =
       controllerRef.current
 
+
     controller?.pause()
+
 
     setTimeout(
       () => {
@@ -954,12 +1070,14 @@ export default function RoomGamePage() {
       80
     )
 
+
     setTimeout(
       () => {
         controller?.pause()
       },
       180
     )
+
 
     setTimeout(
       () => {
@@ -968,6 +1086,7 @@ export default function RoomGamePage() {
       350
     )
 
+
     setIsPlaying(
       false
     )
@@ -975,6 +1094,7 @@ export default function RoomGamePage() {
     setAudioStarting(
       false
     )
+
 
     setTimeout(
       () => {
@@ -989,78 +1109,96 @@ export default function RoomGamePage() {
   /*
   =====================================
   PLAY
-  MISMO PUNTO PARA TODOS
   =====================================
+
+  ESTA ES LA MISMA LÓGICA
+  QUE FUNCIONA EN GAMEPAGE.
+
+  Primera vez:
+  controller.play()
+
+  Siguientes veces:
+  controller.restart()
+
+  Nada de seek().
   */
 
   function togglePlay() {
-  const controller =
-    controllerRef.current
+    const controller =
+      controllerRef.current
 
-  if (
-    !controller ||
-    !spotifyReady ||
-    !roundActive ||
-    roundDone
-  ) {
-    return
-  }
 
-  if (
-    isPlaying ||
-    audioStarting
-  ) {
-    hardStopSpotify()
-    return
-  }
+    if (
+      !controller ||
+      !spotifyReady ||
+      !roundActive ||
+      roundDone
+    ) {
+      return
+    }
 
-  clearTimeout(
-    stopTimerRef.current
-  )
 
-  stoppingRef.current =
-    false
+    if (
+      isPlaying ||
+      audioStarting
+    ) {
+      hardStopSpotify()
 
-  const durationMs =
-    currentLevel.duration *
-    1000
+      return
+    }
 
-  const sharedStart =
-    Number(
-      room?.clip_start ||
-      0
+
+    clearTimeout(
+      stopTimerRef.current
     )
 
-  /*
-  IMPORTANTE EN MÓVIL:
 
-  seek + play ocurren directamente
-  dentro del click del usuario.
-  No usamos setTimeout para play().
-  */
+    stoppingRef.current =
+      false
 
-  controller.seek(
-    sharedStart
-  )
 
-  controller.play()
+    const durationMs =
+      currentLevel.duration *
+      1000
 
-  setAudioStarting(
-    true
-  )
 
-  setIsPlaying(
-    true
-  )
-
-  stopTimerRef.current =
-    setTimeout(
-      () => {
-        hardStopSpotify()
-      },
-      durationMs
+    setAudioStarting(
+      true
     )
-}
+
+    setIsPlaying(
+      true
+    )
+
+
+    /*
+    El timer empieza desde el toque
+    del usuario.
+
+    No depende de playback_started.
+    */
+
+    stopTimerRef.current =
+      setTimeout(
+        () => {
+          hardStopSpotify()
+        },
+        durationMs
+      )
+
+
+    if (
+      hasPlayedCurrentSongRef.current
+    ) {
+      controller.restart()
+
+    } else {
+      hasPlayedCurrentSongRef.current =
+        true
+
+      controller.play()
+    }
+  }
 
 
   /*
@@ -1070,14 +1208,14 @@ export default function RoomGamePage() {
   */
 
   useEffect(() => {
-    if (
-      !room?.id
-    ) {
+    if (!room?.id) {
       return
     }
 
+
     const roomId =
       room.id
+
 
     const channel =
       supabase
@@ -1098,17 +1236,15 @@ export default function RoomGamePage() {
             const updated =
               payload.new
 
+
             const roundChanged =
               updated.current_round !==
               room.current_round
 
+
             const songChanged =
               updated.current_song_id !==
               room.current_song_id
-
-            const clipChanged =
-              updated.clip_start !==
-              room.clip_start
 
 
             setRoom(
@@ -1122,9 +1258,11 @@ export default function RoomGamePage() {
             ) {
               stopSpotify()
 
+
               await loadPlayers(
                 roomId
               )
+
 
               return
             }
@@ -1132,10 +1270,10 @@ export default function RoomGamePage() {
 
             if (
               roundChanged ||
-              songChanged ||
-              clipChanged
+              songChanged
             ) {
               resetRound()
+
 
               if (
                 updated.current_song_id
@@ -1144,6 +1282,7 @@ export default function RoomGamePage() {
                   updated.current_song_id
                 )
               }
+
 
               await loadAnswers(
                 updated.id,
@@ -1186,6 +1325,7 @@ export default function RoomGamePage() {
               player?.player_id
             )
 
+
             loadPlayers(
               roomId
             )
@@ -1204,7 +1344,6 @@ export default function RoomGamePage() {
     room?.id,
     room?.current_round,
     room?.current_song_id,
-    room?.clip_start,
     player?.player_id
   ])
 
@@ -1218,10 +1357,12 @@ export default function RoomGamePage() {
   useEffect(() => {
     if (
       !room?.round_started_at ||
-      room.status !== 'playing'
+      room.status !==
+        'playing'
     ) {
       return
     }
+
 
     const timer =
       setInterval(
@@ -1231,8 +1372,10 @@ export default function RoomGamePage() {
               room.round_started_at
             ).getTime()
 
+
           const now =
             Date.now()
+
 
           const beforeStart =
             start - now
@@ -1249,6 +1392,7 @@ export default function RoomGamePage() {
               false
             )
 
+
             setPreparationLeft(
               Math.max(
                 1,
@@ -1259,9 +1403,11 @@ export default function RoomGamePage() {
               )
             )
 
+
             setTimeLeft(
               ROUND_SECONDS
             )
+
 
             return
           }
@@ -1270,6 +1416,7 @@ export default function RoomGamePage() {
           setPreparationLeft(
             0
           )
+
 
           setRoundActive(
             true
@@ -1310,7 +1457,9 @@ export default function RoomGamePage() {
               true
             )
 
+
             stopSpotify()
+
 
             if (
               !roundDone &&
@@ -1318,6 +1467,7 @@ export default function RoomGamePage() {
             ) {
               timeoutSubmittedRef.current =
                 true
+
 
               finishRound(
                 false,
@@ -1329,6 +1479,7 @@ export default function RoomGamePage() {
         },
         250
       )
+
 
     return () => {
       clearInterval(
@@ -1353,6 +1504,7 @@ export default function RoomGamePage() {
       searchTimer.current
     )
 
+
     if (
       skipNextSearchRef.current
     ) {
@@ -1361,6 +1513,7 @@ export default function RoomGamePage() {
 
       return
     }
+
 
     if (
       query.trim().length < 2 ||
@@ -1376,9 +1529,11 @@ export default function RoomGamePage() {
       return
     }
 
+
     setSearching(
       true
     )
+
 
     searchTimer.current =
       setTimeout(
@@ -1390,12 +1545,14 @@ export default function RoomGamePage() {
             )
           )
 
+
           setSearching(
             false
           )
         },
         90
       )
+
 
     return () => {
       clearTimeout(
@@ -1410,19 +1567,20 @@ export default function RoomGamePage() {
   ])
 
 
-  function selectGuess(
-    track
-  ) {
+  function selectGuess(track) {
     skipNextSearchRef.current =
       true
+
 
     setSelectedGuess(
       track
     )
 
+
     setQuery(
       `${track.title} — ${track.artist}`
     )
+
 
     setSearchResults([])
   }
@@ -1434,9 +1592,7 @@ export default function RoomGamePage() {
   =====================================
   */
 
-  function registerFailure(
-    text
-  ) {
+  function registerFailure(text) {
     if (
       roundDone ||
       !roundActive
@@ -1444,12 +1600,15 @@ export default function RoomGamePage() {
       return
     }
 
+
     const nextWrongCount =
       wrongCount + 1
+
 
     setWrongCount(
       nextWrongCount
     )
+
 
     setAttempts(
       current => [
@@ -1466,7 +1625,9 @@ export default function RoomGamePage() {
       ]
     )
 
+
     stopSpotify()
+
 
     setQuery('')
 
@@ -1477,6 +1638,11 @@ export default function RoomGamePage() {
     setSearchResults([])
 
 
+    /*
+    Si todavía quedan niveles,
+    pasamos al siguiente.
+    */
+
     if (
       levelIndex <
       LEVELS.length - 1
@@ -1486,13 +1652,20 @@ export default function RoomGamePage() {
           current + 1
       )
 
+
       setMessage(
         `−${PENALTY_PER_MISTAKE} pts potenciales`
       )
 
+
       return
     }
 
+
+    /*
+    Último intento fallido:
+    este jugador ya terminó.
+    */
 
     setMessage(
       'Terminaste tus intentos.'
@@ -1539,7 +1712,9 @@ export default function RoomGamePage() {
       return
     }
 
+
     stopSpotify()
+
 
     const correct =
       sameSong(
@@ -1583,7 +1758,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  TERMINAR
+  TERMINAR JUGADOR
   =====================================
   */
 
@@ -1600,7 +1775,9 @@ export default function RoomGamePage() {
       return
     }
 
+
     stopSpotify()
+
 
     setRoundDone(
       true
@@ -1679,6 +1856,7 @@ export default function RoomGamePage() {
         awarded
       )
 
+
       setCorrectPosition(
         position
       )
@@ -1715,10 +1893,12 @@ export default function RoomGamePage() {
         )
       ])
 
+
     } catch (error) {
       console.error(
         error
       )
+
 
       setMessage(
         error.message ||
@@ -1730,12 +1910,17 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  RESET
+  RESET DE RONDA
   =====================================
   */
 
   function resetRound() {
     stopSpotify()
+
+
+    hasPlayedCurrentSongRef.current =
+      false
+
 
     setLevelIndex(
       0
@@ -1789,6 +1974,7 @@ export default function RoomGamePage() {
       false
     )
 
+
     timeoutSubmittedRef.current =
       false
   }
@@ -1806,6 +1992,7 @@ export default function RoomGamePage() {
     ) {
       return
     }
+
 
     stopSpotify()
 
@@ -1830,6 +2017,7 @@ export default function RoomGamePage() {
           'id',
           room.id
         )
+
 
       return
     }
@@ -1863,6 +2051,14 @@ export default function RoomGamePage() {
         )
       ]
 
+
+    /*
+    Lo seguimos guardando porque
+    la columna ya existe.
+
+    Pero esta versión NO usa clip_start
+    para controlar Spotify.
+    */
 
     const clipStart =
       generateClipStart()
@@ -1949,6 +2145,12 @@ export default function RoomGamePage() {
     timeLeft <= 0
 
 
+  /*
+  =====================================
+  TODOS TERMINARON
+  =====================================
+  */
+
   useEffect(() => {
     if (
       everyoneFinished
@@ -1966,7 +2168,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  FINAL
+  PARTIDA FINALIZADA
   =====================================
   */
 
@@ -1990,9 +2192,11 @@ export default function RoomGamePage() {
 
           <Trophy size={58} />
 
+
           <span className="room-eyebrow">
             Partida finalizada
           </span>
+
 
           <h1>
             Resultados finales
@@ -2024,9 +2228,11 @@ export default function RoomGamePage() {
 
                   </span>
 
+
                   <strong>
                     {item.player_name}
                   </strong>
+
 
                   <b>
                     {item.score} pts
@@ -2049,7 +2255,9 @@ export default function RoomGamePage() {
                 )
             }
           >
+
             Volver a salas
+
           </button>
 
         </div>
@@ -2068,6 +2276,14 @@ export default function RoomGamePage() {
   return (
     <section className="room-game-wrap">
 
+
+      {/*
+      IMPORTANTE:
+
+      El contenedor siempre existe
+      para que Spotify pueda crear
+      el controller también en móvil.
+      */}
 
       <div className="spotify-hidden-player">
 
@@ -2100,17 +2316,16 @@ export default function RoomGamePage() {
             <div>
 
               <span className="room-eyebrow">
-
                 Sala {room.code}
-
               </span>
+
 
               <h2>
 
                 Ronda {room.current_round}
-                {' '}
-                de
-                {' '}
+
+                {' de '}
+
                 {room.total_rounds}
 
               </h2>
@@ -2122,6 +2337,7 @@ export default function RoomGamePage() {
 
               <Trophy size={18} />
 
+
               {
                 players.find(
                   item =>
@@ -2130,7 +2346,8 @@ export default function RoomGamePage() {
                 )?.score || 0
               }
 
-              pts
+
+              {' pts'}
 
             </div>
 
@@ -2150,6 +2367,7 @@ export default function RoomGamePage() {
 
             <Clock3 size={22} />
 
+
             {preparationLeft > 0
               ? `Preparando ronda ${preparationLeft}...`
               : formatTime(
@@ -2168,6 +2386,7 @@ export default function RoomGamePage() {
                 className="room-spin"
                 size={34}
               />
+
 
               <strong>
                 Preparando canción...
@@ -2189,12 +2408,16 @@ export default function RoomGamePage() {
                   NIVEL ACTUAL
                 </span>
 
+
                 <strong>
                   {currentLevel.label}
                 </strong>
 
+
                 <small>
+
                   {currentLevel.duration}s de canción
+
                 </small>
 
               </div>
@@ -2212,13 +2435,11 @@ export default function RoomGamePage() {
                       key={level.id}
                       className={
                         `level-pill ${level.id} ${
-                          index ===
-                          levelIndex
+                          index === levelIndex
                             ? 'current'
                             : ''
                         } ${
-                          index <
-                          levelIndex
+                          index < levelIndex
                             ? 'used'
                             : ''
                         }`
@@ -2226,6 +2447,7 @@ export default function RoomGamePage() {
                     >
 
                       {level.label}
+
 
                       <small>
                         {level.duration}s
@@ -2245,6 +2467,7 @@ export default function RoomGamePage() {
                   {potentialPoints} pts
                 </strong>
 
+
                 <span>
                   potenciales
                 </span>
@@ -2255,6 +2478,7 @@ export default function RoomGamePage() {
                   <em>
 
                     {wrongCount}
+
                     {' '}
 
                     {wrongCount === 1
@@ -2328,10 +2552,9 @@ export default function RoomGamePage() {
 
                     <Search size={20} />
 
+
                     <input
-                      value={
-                        query
-                      }
+                      value={query}
                       placeholder="Busca una canción..."
                       disabled={
                         !effectiveRoundActive
@@ -2341,6 +2564,7 @@ export default function RoomGamePage() {
                           setQuery(
                             event.target.value
                           )
+
 
                           setSelectedGuess(
                             null
@@ -2355,7 +2579,9 @@ export default function RoomGamePage() {
                   {searching && (
 
                     <div className="spotify-searching">
+
                       Buscando canciones...
+
                     </div>
 
                   )}
@@ -2369,9 +2595,7 @@ export default function RoomGamePage() {
                         track => (
 
                           <button
-                            key={
-                              track.id
-                            }
+                            key={track.id}
                             type="button"
                             onClick={
                               () =>
@@ -2399,6 +2623,7 @@ export default function RoomGamePage() {
                                 {track.title}
                               </b>
 
+
                               <small>
                                 {track.artist}
                               </small>
@@ -2421,22 +2646,20 @@ export default function RoomGamePage() {
 
                   <button
                     className="guess-btn"
-                    onClick={
-                      guess
-                    }
+                    onClick={guess}
                     disabled={
                       !effectiveRoundActive
                     }
                   >
+
                     Adivinar
+
                   </button>
 
 
                   <button
                     className="skip-inline-btn"
-                    onClick={
-                      skip
-                    }
+                    onClick={skip}
                     disabled={
                       !effectiveRoundActive
                     }
@@ -2456,7 +2679,9 @@ export default function RoomGamePage() {
               {message && (
 
                 <div className="message">
+
                   {message}
+
                 </div>
 
               )}
@@ -2485,9 +2710,7 @@ export default function RoomGamePage() {
                               : ''
                           }`
                         }
-                        key={
-                          index
-                        }
+                        key={index}
                       >
 
                         <span className="attempt-number">
@@ -2505,7 +2728,9 @@ export default function RoomGamePage() {
 
 
                         <span className="attempt-answer">
+
                           {item.text}
+
                         </span>
 
                       </div>
@@ -2546,17 +2771,21 @@ export default function RoomGamePage() {
                     size={31}
                   />
 
+
                   <span>
                     ¡La pegaste!
                   </span>
+
 
                   <h2>
                     {song.title}
                   </h2>
 
+
                   <p>
                     {song.artist}
                   </p>
+
 
                   <strong className="round-earned">
 
@@ -2596,13 +2825,16 @@ export default function RoomGamePage() {
 
                   <X size={31} />
 
+
                   <span>
                     Sin puntos
                   </span>
 
+
                   <h2>
                     {song.title}
                   </h2>
+
 
                   <p>
                     {song.artist}
@@ -2616,8 +2848,11 @@ export default function RoomGamePage() {
               <div className="round-waiting">
 
                 {answers.length}
+
                 {' de '}
+
                 {players.length}
+
                 {' terminaron'}
 
               </div>
@@ -2636,6 +2871,7 @@ export default function RoomGamePage() {
                 >
 
                   <ArrowRight />
+
 
                   {
                     room.current_round >=
@@ -2695,13 +2931,12 @@ export default function RoomGamePage() {
                       answer.player_id
                   )
 
+
                 return (
 
                   <div
                     className="room-correct-row"
-                    key={
-                      answer.id
-                    }
+                    key={answer.id}
                   >
 
                     <span>
@@ -2727,7 +2962,9 @@ export default function RoomGamePage() {
 
 
                     <b>
+
                       +{answer.points} pts
+
                     </b>
 
                   </div>
@@ -2764,18 +3001,18 @@ export default function RoomGamePage() {
 
                   <div
                     className="live-score-row"
-                    key={
-                      item.id
-                    }
+                    key={item.id}
                   >
 
                     <span>
                       #{index + 1}
                     </span>
 
+
                     <strong>
                       {item.player_name}
                     </strong>
+
 
                     <b>
                       {item.score} pts
