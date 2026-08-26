@@ -773,10 +773,17 @@ export default function GamePage() {
       }
     )
 
-
-   controller.addListener(
+controller.addListener(
   'playback_started',
   () => {
+
+    if (
+      slot !==
+      activeSlotRef.current
+    ) {
+      return
+    }
+
 
     if (
       !playingRequestRef.current
@@ -786,104 +793,18 @@ export default function GamePage() {
 
 
     /*
-    Spotify acaba de confirmar
-    que comenzó la reproducción.
+    Solo actualizamos la UI.
+
+    YA NO dependemos de este evento
+    para crear el timer.
     */
-
-    const now =
-      performance.now()
-
-
-    playbackStartedAtRef.current =
-      now
-
-
-    hardStopAtRef.current =
-      now +
-      (
-        targetDurationRef.current ||
-        1000
-      )
-
 
     setAudioStarting(false)
 
     setIsPlaying(true)
-
-
-    clearInterval(
-      playbackWatchdogRef.current
-    )
-
-    clearTimeout(
-      fallbackTimerRef.current
-    )
-
-    cancelAnimationFrame(
-      stopFrameRef.current
-    )
-
-
-    /*
-    ===================================
-    RELOJ DE ALTA PRECISIÓN
-    ===================================
-    */
-
-    const watchPlayback = () => {
-
-      if (
-        !playingRequestRef.current ||
-        hardStopAtRef.current === null
-      ) {
-        return
-      }
-
-
-      if (
-        performance.now() >=
-        hardStopAtRef.current
-      ) {
-
-        forceStopSpotify()
-
-        return
-      }
-
-
-      stopFrameRef.current =
-        requestAnimationFrame(
-          watchPlayback
-        )
-    }
-
-
-    stopFrameRef.current =
-      requestAnimationFrame(
-        watchPlayback
-      )
-
-
-    /*
-    ===================================
-    SEGUNDO RELOJ DE RESPALDO
-    ===================================
-    */
-
-    fallbackTimerRef.current =
-      setTimeout(
-        () => {
-
-          forceStopSpotify()
-
-        },
-        (
-          targetDurationRef.current ||
-          1000
-        ) + 80
-      )
   }
 )
+
   }
 
 
@@ -959,12 +880,9 @@ export default function GamePage() {
 
 function forceStopSpotify() {
 
-  /*
-  Ya estamos cortando.
-  No iniciar otro proceso.
-  */
-
-  if (stoppingRef.current) {
+  if (
+    stoppingRef.current
+  ) {
     return
   }
 
@@ -973,28 +891,14 @@ function forceStopSpotify() {
     true
 
 
-  clearInterval(
-    playbackWatchdogRef.current
-  )
-
   clearTimeout(
     fallbackTimerRef.current
   )
 
-  cancelAnimationFrame(
-    stopFrameRef.current
-  )
-
   clearInterval(
-    pauseHammerRef.current
+    playbackWatchdogRef.current
   )
 
-
-  hardStopAtRef.current =
-    null
-
-  playbackStartedAtRef.current =
-    null
 
   playingRequestRef.current =
     false
@@ -1004,61 +908,45 @@ function forceStopSpotify() {
 
 
   const controller =
-    typeof getActiveController === 'function'
-      ? getActiveController()
-      : controllerRef.current
+    getActiveController()
 
 
   /*
-  PRIMER PAUSE
+  Spotify puede tardar en obedecer.
+  Le mandamos varias pausas.
   */
 
   controller?.pause()
 
 
-  /*
-  SPOTIFY a veces tarda en obedecer.
-  Durante un segundo seguimos
-  enviando PAUSE.
-  */
-
-  let attempts = 0
-
-
-  pauseHammerRef.current =
-    setInterval(
-      () => {
-
-        controller?.pause()
-
-        attempts += 1
+  setTimeout(
+    () => {
+      controller?.pause()
+    },
+    80
+  )
 
 
-        if (attempts >= 10) {
+  setTimeout(
+    () => {
+      controller?.pause()
+    },
+    180
+  )
 
-          clearInterval(
-            pauseHammerRef.current
-          )
 
-          pauseHammerRef.current =
-            null
-        }
-
-      },
-      100
-    )
+  setTimeout(
+    () => {
+      controller?.pause()
+    },
+    350
+  )
 
 
   setAudioStarting(false)
 
   setIsPlaying(false)
 
-
-  /*
-  Dejamos desbloquear otro Play
-  después de que Spotify haya tenido
-  tiempo para detenerse.
-  */
 
   setTimeout(
     () => {
@@ -1067,35 +955,21 @@ function forceStopSpotify() {
         false
 
     },
-    1100
+    450
   )
 }
 
 
 function stopSpotify() {
 
-  clearInterval(
-    playbackWatchdogRef.current
-  )
-
   clearTimeout(
     fallbackTimerRef.current
   )
 
-  cancelAnimationFrame(
-    stopFrameRef.current
-  )
-
   clearInterval(
-    pauseHammerRef.current
+    playbackWatchdogRef.current
   )
 
-
-  hardStopAtRef.current =
-    null
-
-  playbackStartedAtRef.current =
-    null
 
   playingRequestRef.current =
     false
@@ -1103,28 +977,15 @@ function stopSpotify() {
   targetDurationRef.current =
     null
 
-
-  const controller =
-    typeof getActiveController === 'function'
-      ? getActiveController()
-      : controllerRef.current
+  stoppingRef.current =
+    false
 
 
-  controller?.pause()
+  controllerARef.current
+    ?.pause()
 
-
-  /*
-  Segunda orden rápida de seguridad.
-  */
-
-  setTimeout(
-    () => {
-
-      controller?.pause()
-
-    },
-    100
-  )
+  controllerBRef.current
+    ?.pause()
 
 
   setAudioStarting(false)
@@ -1135,73 +996,109 @@ function stopSpotify() {
 
   function togglePlay() {
 
-    const controller =
-      getActiveController()
+  const controller =
+    getActiveController()
 
 
-    if (
-      !controller ||
-      !spotifyReady ||
-      status !== 'playing'
-    ) {
-      return
-    }
-
-
-    if (
-      audioStarting ||
-      isPlaying
-    ) {
-
-      stopSpotify()
-
-      return
-    }
-
-
-    clearInterval(
-      playbackWatchdogRef.current
-    )
-
-    clearTimeout(
-      fallbackTimerRef.current
-    )
-
-
-    stoppingRef.current =
-      false
-
-    playbackStartedAtRef.current =
-      null
-
-    playingRequestRef.current =
-      true
-
-
-    targetDurationRef.current =
-      currentLevel.duration *
-      1000
-
-
-    setAudioStarting(true)
-
-    setIsPlaying(true)
-
-
-    if (
-      activeAlreadyPlayed()
-    ) {
-
-      controller.restart()
-      controller.play()
-
-    } else {
-
-      markActiveAsPlayed()
-
-      controller.play()
-    }
+  if (
+    !controller ||
+    !spotifyReady ||
+    status !== 'playing'
+  ) {
+    return
   }
+
+
+  /*
+  PAUSA MANUAL
+  */
+
+  if (
+    audioStarting ||
+    isPlaying
+  ) {
+
+    forceStopSpotify()
+
+    return
+  }
+
+
+  /*
+  LIMPIAMOS CUALQUIER TIMER ANTERIOR
+  */
+
+  clearTimeout(
+    fallbackTimerRef.current
+  )
+
+  clearInterval(
+    playbackWatchdogRef.current
+  )
+
+
+  stoppingRef.current =
+    false
+
+  playingRequestRef.current =
+    true
+
+
+  const durationMs =
+    currentLevel.duration *
+    1000
+
+
+  targetDurationRef.current =
+    durationMs
+
+
+  setAudioStarting(true)
+
+  setIsPlaying(true)
+
+
+  /*
+  ======================================
+  IMPORTANTE
+  ======================================
+
+  El timer se crea ANTES de Spotify.
+
+  Así aunque playback_started nunca llegue,
+  la canción se corta sí o sí.
+  */
+
+  fallbackTimerRef.current =
+    setTimeout(
+      () => {
+
+        forceStopSpotify()
+
+      },
+      durationMs + 350
+    )
+
+
+  /*
+  REPRODUCCIÓN
+  */
+
+  if (
+    activeAlreadyPlayed()
+  ) {
+
+    controller.restart()
+
+    controller.play()
+
+  } else {
+
+    markActiveAsPlayed()
+
+    controller.play()
+  }
+}
 
 
   /*
