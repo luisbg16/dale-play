@@ -3907,3 +3907,150 @@ h2 {
     font-size: 1.35rem;
   }
 }
+
+/* =====================================
+   ROOM GAME - SAME VISUAL LANGUAGE
+   ===================================== */
+
+.room-game-wrap {
+  width: min(680px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 70px;
+}
+
+.room-solo-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+
+  margin-bottom: 12px;
+}
+
+.room-solo-header h1 {
+  margin: 2px 0 0;
+
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.room-meta {
+  display: block;
+
+  font-size: .68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+
+  color:
+    rgba(255,255,255,.4);
+}
+
+.room-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.room-round-label {
+  color:
+    rgba(255,255,255,.45);
+}
+
+.room-score-label {
+  color:
+    rgba(255,255,255,.7);
+}
+
+
+/* tiempo: presente pero sin robarse el juego */
+
+.room-compact-timer {
+  width: fit-content;
+
+  margin:
+    0 auto
+    22px;
+
+  padding:
+    6px
+    11px;
+
+  border-radius: 999px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.08);
+
+  background:
+    rgba(255,255,255,.035);
+
+  font-size: .78rem;
+  font-weight: 800;
+
+  color:
+    rgba(255,255,255,.7);
+}
+
+.room-compact-timer.danger {
+  border-color:
+    rgba(255,90,90,.4);
+
+  color:
+    #ff7373;
+}
+
+.room-preparing-simple {
+  padding: 50px 0;
+
+  text-align: center;
+
+  color:
+    rgba(255,255,255,.5);
+}
+
+
+/* =====================================
+   MOBILE
+   ===================================== */
+
+@media (max-width: 700px) {
+
+  .room-game-wrap {
+    width: calc(100% - 20px);
+
+    padding:
+      28px
+      0
+      calc(
+        48px +
+        env(safe-area-inset-bottom)
+      );
+  }
+
+  .room-solo-header {
+    margin-bottom: 10px;
+  }
+
+  .room-solo-header h1 {
+    font-size: 1.05rem;
+  }
+
+  .room-meta {
+    font-size: .6rem;
+  }
+
+  .room-header-right {
+    gap: 7px;
+    font-size: .7rem;
+  }
+
+  .room-compact-timer {
+    margin-bottom: 24px;
+
+    font-size: .72rem;
+  }
+}
