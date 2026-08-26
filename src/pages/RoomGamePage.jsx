@@ -833,134 +833,125 @@ export default function RoomGamePage() {
 
 
   async function prepareSpotifySong(
-    spotifyId
-  ) {
-    stopSpotify()
+  spotifyId
+) {
+  stopSpotify()
 
-    setSpotifyReady(
-      false
-    )
+  setSpotifyReady(false)
 
+  hasPlayedCurrentSongRef.current =
+    false
 
-    hasPlayedCurrentSongRef.current =
-      false
+  try {
+    const IFrameAPI =
+      iframeApiRef.current ||
+      await loadSpotifyIframeApi()
 
+    iframeApiRef.current =
+      IFrameAPI
 
-    try {
-      const IFrameAPI =
-        iframeApiRef.current ||
-        await loadSpotifyIframeApi()
-
-
-      iframeApiRef.current =
-        IFrameAPI
+    const uri =
+      `spotify:track:${spotifyId}`
 
 
-      const uri =
-        `spotify:track:${spotifyId}`
+    /*
+    =====================================
+    CONTROLLER YA EXISTE
+    =====================================
+
+    Cargamos SIEMPRE la canción
+    desde el segundo 0.
+
+    No usamos seek().
+    */
+
+    if (
+      controllerRef.current
+    ) {
+      loadedSpotifyIdRef.current =
+        spotifyId
+
+      controllerRef.current
+        .loadEntity(
+          uri,
+          false,
+          0
+        )
+
+      setTimeout(
+        () => {
+          setSpotifyReady(true)
+        },
+        500
+      )
+
+      return
+    }
 
 
-      /*
-      ---------------------------------
-      YA EXISTE CONTROLLER
-      ---------------------------------
-      */
+    /*
+    =====================================
+    PRIMER CONTROLLER
+    =====================================
+    */
 
-      if (
-        controllerRef.current
-      ) {
-        if (
-          loadedSpotifyIdRef.current !==
+    const element =
+      document.getElementById(
+        'spotify-room-embed'
+      )
+
+    if (!element) {
+      console.warn(
+        'Spotify embed todavía no está montado.'
+      )
+
+      return
+    }
+
+
+    IFrameAPI.createController(
+      element,
+      {
+        width: '100%',
+        height: 80,
+        uri
+      },
+      controller => {
+        controllerRef.current =
+          controller
+
+        loadedSpotifyIdRef.current =
           spotifyId
-        ) {
-          loadedSpotifyIdRef.current =
-            spotifyId
 
-
-          controllerRef.current
-            .loadEntity(
-              uri
-            )
-        }
+        setupSpotifyEvents(
+          controller
+        )
 
 
         /*
-        Como Spotify no nos da un
-        evento perfecto por cada
-        loadEntity, usamos el tiempo
-        de preparación de la ronda.
+        Reforzamos que la primera
+        canción también quede en 0.
         */
 
-        setTimeout(
-          () => {
-            setSpotifyReady(
-              true
-            )
-          },
-          500
+        controller.loadEntity(
+          uri,
+          false,
+          0
         )
-
-
-        return
       }
+    )
 
+  } catch (error) {
+    console.error(
+      'Error preparando Spotify:',
+      error
+    )
 
-      /*
-      ---------------------------------
-      PRIMER CONTROLLER
-      ---------------------------------
-      */
-
-      const element =
-        document.getElementById(
-          'spotify-room-embed'
-        )
-
-
-      if (!element) {
-        console.warn(
-          'Spotify embed todavía no está montado.'
-        )
-
-        return
-      }
-
-
-      IFrameAPI.createController(
-        element,
-        {
-          width: '100%',
-          height: 80,
-          uri
-        },
-        controller => {
-          controllerRef.current =
-            controller
-
-
-          loadedSpotifyIdRef.current =
-            spotifyId
-
-
-          setupSpotifyEvents(
-            controller
-          )
-        }
-      )
-
-
-    } catch (error) {
-      console.error(
-        'Error preparando Spotify:',
-        error
-      )
-
-
-      setMessage(
-        'No se pudo preparar el audio.'
-      )
-    }
+    setMessage(
+      'No se pudo preparar el audio.'
+    )
   }
+}
 
 
   function setupSpotifyEvents(
@@ -1111,94 +1102,62 @@ export default function RoomGamePage() {
   PLAY
   =====================================
 
-  ESTA ES LA MISMA LÓGICA
-  QUE FUNCIONA EN GAMEPAGE.
-
-  Primera vez:
-  controller.play()
-
-  Siguientes veces:
-  controller.restart()
-
-  Nada de seek().
   */
 
   function togglePlay() {
-    const controller =
-      controllerRef.current
+  const controller =
+    controllerRef.current
 
-
-    if (
-      !controller ||
-      !spotifyReady ||
-      !roundActive ||
-      roundDone
-    ) {
-      return
-    }
-
-
-    if (
-      isPlaying ||
-      audioStarting
-    ) {
-      hardStopSpotify()
-
-      return
-    }
-
-
-    clearTimeout(
-      stopTimerRef.current
-    )
-
-
-    stoppingRef.current =
-      false
-
-
-    const durationMs =
-      currentLevel.duration *
-      1000
-
-
-    setAudioStarting(
-      true
-    )
-
-    setIsPlaying(
-      true
-    )
-
-
-    /*
-    El timer empieza desde el toque
-    del usuario.
-
-    No depende de playback_started.
-    */
-
-    stopTimerRef.current =
-      setTimeout(
-        () => {
-          hardStopSpotify()
-        },
-        durationMs
-      )
-
-
-    if (
-      hasPlayedCurrentSongRef.current
-    ) {
-      controller.restart()
-
-    } else {
-      hasPlayedCurrentSongRef.current =
-        true
-
-      controller.play()
-    }
+  if (
+    !controller ||
+    !spotifyReady ||
+    !roundActive ||
+    roundDone
+  ) {
+    return
   }
+
+  if (
+    isPlaying ||
+    audioStarting
+  ) {
+    hardStopSpotify()
+    return
+  }
+
+  clearTimeout(
+    stopTimerRef.current
+  )
+
+  stoppingRef.current =
+    false
+
+  const durationMs =
+    currentLevel.duration *
+    1000
+
+  setAudioStarting(true)
+  setIsPlaying(true)
+
+  stopTimerRef.current =
+    setTimeout(
+      () => {
+        hardStopSpotify()
+      },
+      durationMs
+    )
+
+  if (
+    hasPlayedCurrentSongRef.current
+  ) {
+    controller.restart()
+  } else {
+    hasPlayedCurrentSongRef.current =
+      true
+
+    controller.play()
+  }
+}
 
 
   /*
