@@ -19,7 +19,9 @@ import {
   Clock3,
   X,
   CheckCircle2,
-  LoaderCircle
+  LoaderCircle,
+  RotateCcw,
+  LogOut
 } from 'lucide-react'
 
 import {
@@ -103,7 +105,8 @@ function sameSong(song, guess) {
   if (
     song.spotify_id &&
     guess.spotify_id &&
-    song.spotify_id === guess.spotify_id
+    song.spotify_id ===
+      guess.spotify_id
   ) {
     return true
   }
@@ -237,17 +240,6 @@ function formatTime(seconds) {
 }
 
 
-function generateClipStart() {
-  const min = 10
-  const max = 55
-
-  return Math.floor(
-    Math.random() *
-    (max - min + 1)
-  ) + min
-}
-
-
 export default function RoomGamePage() {
   const { code } =
     useParams()
@@ -255,12 +247,6 @@ export default function RoomGamePage() {
   const navigate =
     useNavigate()
 
-
-  /*
-  =====================================
-  SALA
-  =====================================
-  */
 
   const [room, setRoom] =
     useState(null)
@@ -280,12 +266,6 @@ export default function RoomGamePage() {
   const [answers, setAnswers] =
     useState([])
 
-
-  /*
-  =====================================
-  RONDA
-  =====================================
-  */
 
   const [levelIndex, setLevelIndex] =
     useState(0)
@@ -308,12 +288,6 @@ export default function RoomGamePage() {
   ] = useState(0)
 
 
-  /*
-  =====================================
-  TIEMPO
-  =====================================
-  */
-
   const [timeLeft, setTimeLeft] =
     useState(ROUND_SECONDS)
 
@@ -335,12 +309,6 @@ export default function RoomGamePage() {
   const timeoutSubmittedRef =
     useRef(false)
 
-
-  /*
-  =====================================
-  BUSCADOR
-  =====================================
-  */
 
   const [query, setQuery] =
     useState('')
@@ -411,6 +379,12 @@ export default function RoomGamePage() {
   ] = useState(false)
 
 
+  const [
+    restartingGame,
+    setRestartingGame
+  ] = useState(false)
+
+
   const [message, setMessage] =
     useState('')
 
@@ -426,6 +400,11 @@ export default function RoomGamePage() {
       wrongCount *
         PENALTY_PER_MISTAKE
     )
+
+
+  const isLastLevel =
+    levelIndex ===
+    LEVELS.length - 1
 
 
   /*
@@ -563,7 +542,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  CANCIONES
+  DATOS
   =====================================
   */
 
@@ -630,12 +609,6 @@ export default function RoomGamePage() {
   }
 
 
-  /*
-  =====================================
-  JUGADORES
-  =====================================
-  */
-
   async function loadPlayers(roomId) {
     const {
       data,
@@ -668,12 +641,6 @@ export default function RoomGamePage() {
     )
   }
 
-
-  /*
-  =====================================
-  RESPUESTAS
-  =====================================
-  */
 
   async function loadAnswers(
     roomId,
@@ -736,9 +703,7 @@ export default function RoomGamePage() {
 
 
       if (ownAnswer) {
-        setRoundDone(
-          true
-        )
+        setRoundDone(true)
 
         setRoundPoints(
           ownAnswer.points || 0
@@ -770,9 +735,7 @@ export default function RoomGamePage() {
           )
 
         } else {
-          setCorrectPosition(
-            0
-          )
+          setCorrectPosition(0)
         }
       }
     }
@@ -781,17 +744,8 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  PREPARAR SPOTIFY
+  SPOTIFY
   =====================================
-
-  IMPORTANTE:
-
-  Ya NO hacemos seek().
-  Ya NO usamos clip_start para mover
-  el audio.
-
-  Usamos la misma estrategia del
-  GamePage normal.
   */
 
   useEffect(() => {
@@ -833,125 +787,117 @@ export default function RoomGamePage() {
 
 
   async function prepareSpotifySong(
-  spotifyId
-) {
-  stopSpotify()
+    spotifyId
+  ) {
+    stopSpotify()
 
-  setSpotifyReady(false)
+    setSpotifyReady(false)
 
-  hasPlayedCurrentSongRef.current =
-    false
-
-  try {
-    const IFrameAPI =
-      iframeApiRef.current ||
-      await loadSpotifyIframeApi()
-
-    iframeApiRef.current =
-      IFrameAPI
-
-    const uri =
-      `spotify:track:${spotifyId}`
+    hasPlayedCurrentSongRef.current =
+      false
 
 
-    /*
-    =====================================
-    CONTROLLER YA EXISTE
-    =====================================
-
-    Cargamos SIEMPRE la canción
-    desde el segundo 0.
-
-    No usamos seek().
-    */
-
-    if (
-      controllerRef.current
-    ) {
-      loadedSpotifyIdRef.current =
-        spotifyId
-
-      controllerRef.current
-        .loadEntity(
-          uri,
-          false,
-          0
-        )
-
-      setTimeout(
-        () => {
-          setSpotifyReady(true)
-        },
-        500
-      )
-
-      return
-    }
+    try {
+      const IFrameAPI =
+        iframeApiRef.current ||
+        await loadSpotifyIframeApi()
 
 
-    /*
-    =====================================
-    PRIMER CONTROLLER
-    =====================================
-    */
-
-    const element =
-      document.getElementById(
-        'spotify-room-embed'
-      )
-
-    if (!element) {
-      console.warn(
-        'Spotify embed todavía no está montado.'
-      )
-
-      return
-    }
+      iframeApiRef.current =
+        IFrameAPI
 
 
-    IFrameAPI.createController(
-      element,
-      {
-        width: '100%',
-        height: 80,
-        uri
-      },
-      controller => {
-        controllerRef.current =
-          controller
+      const uri =
+        `spotify:track:${spotifyId}`
 
-        loadedSpotifyIdRef.current =
+
+      if (
+        controllerRef.current
+      ) {
+        if (
+          loadedSpotifyIdRef.current !==
           spotifyId
+        ) {
+          loadedSpotifyIdRef.current =
+            spotifyId
 
-        setupSpotifyEvents(
-          controller
+
+          controllerRef.current
+            .loadEntity(
+              uri,
+              false,
+              0
+            )
+        }
+
+
+        setTimeout(
+          () => {
+            setSpotifyReady(true)
+          },
+          500
         )
 
 
-        /*
-        Reforzamos que la primera
-        canción también quede en 0.
-        */
-
-        controller.loadEntity(
-          uri,
-          false,
-          0
-        )
+        return
       }
-    )
 
-  } catch (error) {
-    console.error(
-      'Error preparando Spotify:',
-      error
-    )
 
-    setMessage(
-      'No se pudo preparar el audio.'
-    )
+      const element =
+        document.getElementById(
+          'spotify-room-embed'
+        )
+
+
+      if (!element) {
+        console.warn(
+          'Spotify embed todavía no está montado.'
+        )
+
+        return
+      }
+
+
+      IFrameAPI.createController(
+        element,
+        {
+          width: '100%',
+          height: 80,
+          uri
+        },
+        controller => {
+          controllerRef.current =
+            controller
+
+          loadedSpotifyIdRef.current =
+            spotifyId
+
+          setupSpotifyEvents(
+            controller
+          )
+
+
+          controller.loadEntity(
+            uri,
+            false,
+            0
+          )
+        }
+      )
+
+
+    } catch (error) {
+      console.error(
+        'Error preparando Spotify:',
+        error
+      )
+
+
+      setMessage(
+        'No se pudo preparar el audio.'
+      )
+    }
   }
-}
 
 
   function setupSpotifyEvents(
@@ -960,9 +906,7 @@ export default function RoomGamePage() {
     controller.addListener(
       'ready',
       () => {
-        setSpotifyReady(
-          true
-        )
+        setSpotifyReady(true)
       }
     )
 
@@ -970,30 +914,13 @@ export default function RoomGamePage() {
     controller.addListener(
       'playback_started',
       () => {
-        /*
-        Este evento NO controla
-        el corte del fragmento.
+        setAudioStarting(false)
 
-        Solo actualiza la interfaz.
-        */
-
-        setAudioStarting(
-          false
-        )
-
-        setIsPlaying(
-          true
-        )
+        setIsPlaying(true)
       }
     )
   }
 
-
-  /*
-  =====================================
-  DETENER AUDIO
-  =====================================
-  */
 
   function stopSpotify() {
     clearTimeout(
@@ -1016,14 +943,9 @@ export default function RoomGamePage() {
     )
 
 
-    setIsPlaying(
-      false
-    )
+    setIsPlaying(false)
 
-    setAudioStarting(
-      false
-    )
-
+    setAudioStarting(false)
 
     stoppingRef.current =
       false
@@ -1078,13 +1000,9 @@ export default function RoomGamePage() {
     )
 
 
-    setIsPlaying(
-      false
-    )
+    setIsPlaying(false)
 
-    setAudioStarting(
-      false
-    )
+    setAudioStarting(false)
 
 
     setTimeout(
@@ -1097,67 +1015,71 @@ export default function RoomGamePage() {
   }
 
 
-  /*
-  =====================================
-  PLAY
-  =====================================
-
-  */
-
   function togglePlay() {
-  const controller =
-    controllerRef.current
+    const controller =
+      controllerRef.current
 
-  if (
-    !controller ||
-    !spotifyReady ||
-    !roundActive ||
-    roundDone
-  ) {
-    return
-  }
 
-  if (
-    isPlaying ||
-    audioStarting
-  ) {
-    hardStopSpotify()
-    return
-  }
+    if (
+      !controller ||
+      !spotifyReady ||
+      !roundActive ||
+      roundDone
+    ) {
+      return
+    }
 
-  clearTimeout(
-    stopTimerRef.current
-  )
 
-  stoppingRef.current =
-    false
+    if (
+      isPlaying ||
+      audioStarting
+    ) {
+      hardStopSpotify()
 
-  const durationMs =
-    currentLevel.duration *
-    1000
+      return
+    }
 
-  setAudioStarting(true)
-  setIsPlaying(true)
 
-  stopTimerRef.current =
-    setTimeout(
-      () => {
-        hardStopSpotify()
-      },
-      durationMs
+    clearTimeout(
+      stopTimerRef.current
     )
 
-  if (
-    hasPlayedCurrentSongRef.current
-  ) {
-    controller.restart()
-  } else {
-    hasPlayedCurrentSongRef.current =
-      true
 
-    controller.play()
+    stoppingRef.current =
+      false
+
+
+    const durationMs =
+      currentLevel.duration *
+      1000
+
+
+    setAudioStarting(true)
+
+    setIsPlaying(true)
+
+
+    stopTimerRef.current =
+      setTimeout(
+        () => {
+          hardStopSpotify()
+        },
+        durationMs
+      )
+
+
+    if (
+      hasPlayedCurrentSongRef.current
+    ) {
+      controller.restart()
+
+    } else {
+      hasPlayedCurrentSongRef.current =
+        true
+
+      controller.play()
+    }
   }
-}
 
 
   /*
@@ -1206,9 +1128,12 @@ export default function RoomGamePage() {
               room.current_song_id
 
 
-            setRoom(
-              updated
-            )
+            const statusChanged =
+              updated.status !==
+              room.status
+
+
+            setRoom(updated)
 
 
             if (
@@ -1217,11 +1142,17 @@ export default function RoomGamePage() {
             ) {
               stopSpotify()
 
+              await Promise.all([
+                loadPlayers(
+                  roomId
+                ),
 
-              await loadPlayers(
-                roomId
-              )
-
+                loadAnswers(
+                  roomId,
+                  updated.current_round,
+                  player?.player_id
+                )
+              ])
 
               return
             }
@@ -1229,9 +1160,15 @@ export default function RoomGamePage() {
 
             if (
               roundChanged ||
-              songChanged
+              songChanged ||
+              statusChanged
             ) {
               resetRound()
+
+
+              await loadPlayers(
+                roomId
+              )
 
 
               if (
@@ -1284,7 +1221,6 @@ export default function RoomGamePage() {
               player?.player_id
             )
 
-
             loadPlayers(
               roomId
             )
@@ -1303,13 +1239,14 @@ export default function RoomGamePage() {
     room?.id,
     room?.current_round,
     room?.current_song_id,
+    room?.status,
     player?.player_id
   ])
 
 
   /*
   =====================================
-  TIMER GLOBAL
+  TIMER
   =====================================
   */
 
@@ -1343,13 +1280,9 @@ export default function RoomGamePage() {
           if (
             beforeStart > 0
           ) {
-            setRoundActive(
-              false
-            )
+            setRoundActive(false)
 
-            setRoundExpired(
-              false
-            )
+            setRoundExpired(false)
 
 
             setPreparationLeft(
@@ -1372,14 +1305,9 @@ export default function RoomGamePage() {
           }
 
 
-          setPreparationLeft(
-            0
-          )
+          setPreparationLeft(0)
 
-
-          setRoundActive(
-            true
-          )
+          setRoundActive(true)
 
 
           const elapsed =
@@ -1408,14 +1336,9 @@ export default function RoomGamePage() {
           if (
             remaining <= 0
           ) {
-            setRoundActive(
-              false
-            )
+            setRoundActive(false)
 
-            setRoundExpired(
-              true
-            )
-
+            setRoundExpired(true)
 
             stopSpotify()
 
@@ -1441,9 +1364,7 @@ export default function RoomGamePage() {
 
 
     return () => {
-      clearInterval(
-        timer
-      )
+      clearInterval(timer)
     }
   }, [
     room?.round_started_at,
@@ -1481,17 +1402,13 @@ export default function RoomGamePage() {
     ) {
       setSearchResults([])
 
-      setSearching(
-        false
-      )
+      setSearching(false)
 
       return
     }
 
 
-    setSearching(
-      true
-    )
+    setSearching(true)
 
 
     searchTimer.current =
@@ -1505,9 +1422,7 @@ export default function RoomGamePage() {
           )
 
 
-          setSearching(
-            false
-          )
+          setSearching(false)
         },
         90
       )
@@ -1531,9 +1446,7 @@ export default function RoomGamePage() {
       true
 
 
-    setSelectedGuess(
-      track
-    )
+    setSelectedGuess(track)
 
 
     setQuery(
@@ -1547,7 +1460,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  FALLO / SALTAR
+  PASAR NIVEL / RENDIRSE
   =====================================
   */
 
@@ -1587,20 +1500,12 @@ export default function RoomGamePage() {
 
     stopSpotify()
 
-
     setQuery('')
 
-    setSelectedGuess(
-      null
-    )
+    setSelectedGuess(null)
 
     setSearchResults([])
 
-
-    /*
-    Si todavía quedan niveles,
-    pasamos al siguiente.
-    */
 
     if (
       levelIndex <
@@ -1621,11 +1526,6 @@ export default function RoomGamePage() {
     }
 
 
-    /*
-    Último intento fallido:
-    este jugador ya terminó.
-    */
-
     setMessage(
       'Terminaste tus intentos.'
     )
@@ -1640,9 +1540,11 @@ export default function RoomGamePage() {
   }
 
 
-  function skip() {
+  function passLevel() {
     registerFailure(
-      'Saltado'
+      isLastLevel
+        ? 'Rendirse'
+        : 'Pasar nivel'
     )
   }
 
@@ -1660,9 +1562,7 @@ export default function RoomGamePage() {
       roundDone ||
       !roundActive
     ) {
-      if (
-        !selectedGuess
-      ) {
+      if (!selectedGuess) {
         setMessage(
           'Selecciona una canción.'
         )
@@ -1737,10 +1637,7 @@ export default function RoomGamePage() {
 
     stopSpotify()
 
-
-    setRoundDone(
-      true
-    )
+    setRoundDone(true)
 
 
     const finalWrongCount =
@@ -1815,7 +1712,6 @@ export default function RoomGamePage() {
         awarded
       )
 
-
       setCorrectPosition(
         position
       )
@@ -1826,9 +1722,7 @@ export default function RoomGamePage() {
           'Se acabó el tiempo.'
         )
 
-      } else if (
-        correct
-      ) {
+      } else if (correct) {
         setMessage(
           `¡Correcto! #${position} · +${awarded} pts`
         )
@@ -1854,9 +1748,7 @@ export default function RoomGamePage() {
 
 
     } catch (error) {
-      console.error(
-        error
-      )
+      console.error(error)
 
 
       setMessage(
@@ -1869,7 +1761,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  RESET DE RONDA
+  RESET RONDA
   =====================================
   */
 
@@ -1881,33 +1773,21 @@ export default function RoomGamePage() {
       false
 
 
-    setLevelIndex(
-      0
-    )
+    setLevelIndex(0)
 
     setAttempts([])
 
-    setWrongCount(
-      0
-    )
+    setWrongCount(0)
 
-    setRoundDone(
-      false
-    )
+    setRoundDone(false)
 
-    setRoundPoints(
-      0
-    )
+    setRoundPoints(0)
 
-    setCorrectPosition(
-      0
-    )
+    setCorrectPosition(0)
 
     setQuery('')
 
-    setSelectedGuess(
-      null
-    )
+    setSelectedGuess(null)
 
     setSearchResults([])
 
@@ -1921,17 +1801,11 @@ export default function RoomGamePage() {
       PREPARE_SECONDS
     )
 
-    setRoundActive(
-      false
-    )
+    setRoundActive(false)
 
-    setRoundExpired(
-      false
-    )
+    setRoundExpired(false)
 
-    setSpotifyReady(
-      false
-    )
+    setSpotifyReady(false)
 
 
     timeoutSubmittedRef.current =
@@ -1960,22 +1834,32 @@ export default function RoomGamePage() {
       room.current_round >=
       room.total_rounds
     ) {
-      await supabase
-        .from('rooms')
-        .update({
-          status:
-            'finished',
+      const {
+        error
+      } =
+        await supabase
+          .from('rooms')
+          .update({
+            status:
+              'finished',
 
-          current_song_id:
-            null,
+            current_song_id:
+              null,
 
-          round_started_at:
-            null
-        })
-        .eq(
-          'id',
-          room.id
+            round_started_at:
+              null
+          })
+          .eq(
+            'id',
+            room.id
+          )
+
+
+      if (error) {
+        setMessage(
+          error.message
         )
+      }
 
 
       return
@@ -1991,9 +1875,7 @@ export default function RoomGamePage() {
       )
 
 
-    if (
-      !candidates.length
-    ) {
+    if (!candidates.length) {
       setMessage(
         'No hay canciones disponibles.'
       )
@@ -2009,18 +1891,6 @@ export default function RoomGamePage() {
           candidates.length
         )
       ]
-
-
-    /*
-    Lo seguimos guardando porque
-    la columna ya existe.
-
-    Pero esta versión NO usa clip_start
-    para controlar Spotify.
-    */
-
-    const clipStart =
-      generateClipStart()
 
 
     const startAt =
@@ -2045,10 +1915,7 @@ export default function RoomGamePage() {
             nextSong.id,
 
           round_started_at:
-            startAt,
-
-          clip_start:
-            clipStart
+            startAt
         })
         .eq(
           'id',
@@ -2060,6 +1927,125 @@ export default function RoomGamePage() {
       setMessage(
         error.message
       )
+    }
+  }
+
+
+  /*
+  =====================================
+  JUGAR OTRA VEZ
+  =====================================
+  */
+
+  async function playAgain() {
+    if (
+      !player?.is_host ||
+      !room ||
+      restartingGame
+    ) {
+      return
+    }
+
+
+    const availableSongs =
+      songs.filter(
+        item =>
+          Boolean(
+            item.spotify_id
+          )
+      )
+
+
+    if (!availableSongs.length) {
+      setMessage(
+        'No hay canciones disponibles.'
+      )
+
+      return
+    }
+
+
+    setRestartingGame(true)
+
+    setMessage('')
+
+
+    try {
+      const firstSong =
+        availableSongs[
+          Math.floor(
+            Math.random() *
+            availableSongs.length
+          )
+        ]
+
+
+      const startAt =
+        new Date(
+          Date.now() +
+          PREPARE_SECONDS *
+            1000
+        )
+          .toISOString()
+
+
+      const {
+        error
+      } =
+        await supabase
+          .rpc(
+            'restart_room_game',
+            {
+              p_room_id:
+                room.id,
+
+              p_host_player_id:
+                player.player_id,
+
+              p_song_id:
+                firstSong.id,
+
+              p_round_started_at:
+                startAt
+            }
+          )
+
+
+      if (error) {
+        throw error
+      }
+
+
+      resetRound()
+
+      await Promise.all([
+        loadPlayers(
+          room.id
+        ),
+
+        loadAnswers(
+          room.id,
+          1,
+          player.player_id
+        ),
+
+        loadSong(
+          firstSong.id
+        )
+      ])
+
+
+    } catch (error) {
+      console.error(error)
+
+
+      setMessage(
+        error.message ||
+        'No se pudo reiniciar la partida.'
+      )
+
+    } finally {
+      setRestartingGame(false)
     }
   }
 
@@ -2104,21 +2090,13 @@ export default function RoomGamePage() {
     timeLeft <= 0
 
 
-  /*
-  =====================================
-  TODOS TERMINARON
-  =====================================
-  */
-
   useEffect(() => {
     if (
       everyoneFinished
     ) {
       stopSpotify()
 
-      setRoundActive(
-        false
-      )
+      setRoundActive(false)
     }
   }, [
     everyoneFinished
@@ -2127,7 +2105,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  PARTIDA FINALIZADA
+  FINAL
   =====================================
   */
 
@@ -2205,19 +2183,87 @@ export default function RoomGamePage() {
           </div>
 
 
-          <button
-            className="primary"
-            onClick={
-              () =>
-                navigate(
-                  '/salas'
-                )
-            }
-          >
+          {message && (
 
-            Volver a salas
+            <div className="message">
 
-          </button>
+              {message}
+
+            </div>
+
+          )}
+
+
+          {player?.is_host ? (
+
+            <div className="final-game-actions">
+
+              <button
+                className="primary"
+                onClick={
+                  playAgain
+                }
+                disabled={
+                  restartingGame
+                }
+              >
+
+                <RotateCcw size={19} />
+
+
+                {restartingGame
+                  ? 'Preparando...'
+                  : 'Jugar otra vez'}
+
+              </button>
+
+
+              <button
+                className="secondary"
+                onClick={
+                  () =>
+                    navigate(
+                      '/salas'
+                    )
+                }
+              >
+
+                <LogOut size={19} />
+
+                Salir
+
+              </button>
+
+            </div>
+
+          ) : (
+
+            <>
+
+              <p className="muted">
+
+                Esperando al host...
+
+              </p>
+
+
+              <button
+                className="secondary"
+                onClick={
+                  () =>
+                    navigate(
+                      '/salas'
+                    )
+                }
+              >
+
+                Salir
+
+              </button>
+
+            </>
+
+          )}
 
         </div>
 
@@ -2235,14 +2281,6 @@ export default function RoomGamePage() {
   return (
     <section className="room-game-wrap">
 
-
-      {/*
-      IMPORTANTE:
-
-      El contenedor siempre existe
-      para que Spotify pueda crear
-      el controller también en móvil.
-      */}
 
       <div className="spotify-hidden-player">
 
@@ -2275,7 +2313,9 @@ export default function RoomGamePage() {
             <div>
 
               <span className="room-eyebrow">
+
                 Sala {room.code}
+
               </span>
 
 
@@ -2361,149 +2401,129 @@ export default function RoomGamePage() {
 
             <>
 
-              <div className="room-level-card">
+              <div className="room-main-play-area">
 
-                <span>
-                  NIVEL ACTUAL
-                </span>
+                <div className="room-level-card">
 
-
-                <strong>
-                  {currentLevel.label}
-                </strong>
+                  <span>
+                    NIVEL ACTUAL
+                  </span>
 
 
-                <small>
-
-                  {currentLevel.duration}s de canción
-
-                </small>
-
-              </div>
+                  <strong>
+                    {currentLevel.label}
+                  </strong>
 
 
-              <div className="difficulty-row">
+                  <small>
 
-                {LEVELS.map(
-                  (
-                    level,
-                    index
-                  ) => (
+                    {currentLevel.duration}s de canción
 
-                    <div
-                      key={level.id}
-                      className={
-                        `level-pill ${level.id} ${
-                          index === levelIndex
-                            ? 'current'
-                            : ''
-                        } ${
-                          index < levelIndex
-                            ? 'used'
-                            : ''
-                        }`
-                      }
-                    >
+                  </small>
 
-                      {level.label}
+                </div>
 
 
-                      <small>
-                        {level.duration}s
-                      </small>
+                <div className="difficulty-row">
 
-                    </div>
+                  {LEVELS.map(
+                    (
+                      level,
+                      index
+                    ) => (
 
-                  )
-                )}
+                      <div
+                        key={level.id}
+                        className={
+                          `level-pill ${level.id} ${
+                            index === levelIndex
+                              ? 'current'
+                              : ''
+                          } ${
+                            index < levelIndex
+                              ? 'used'
+                              : ''
+                          }`
+                        }
+                      >
 
-              </div>
-
-
-              <div className="room-potential-score">
-
-                <strong>
-                  {potentialPoints} pts
-                </strong>
-
-
-                <span>
-                  potenciales
-                </span>
-
-
-                {wrongCount > 0 && (
-
-                  <em>
-
-                    {wrongCount}
-
-                    {' '}
-
-                    {wrongCount === 1
-                      ? 'fallo'
-                      : 'fallos'}
-
-                    {' · −'}
-
-                    {wrongCount *
-                      PENALTY_PER_MISTAKE}
-
-                    {' pts'}
-
-                  </em>
-
-                )}
-
-              </div>
+                        {level.label}
 
 
-              <button
-                className={
-                  `play-button ${
-                    audioStarting
-                      ? 'audio-starting'
-                      : ''
-                  }`
-                }
-                onClick={
-                  togglePlay
-                }
-                disabled={
-                  !spotifyReady ||
-                  !effectiveRoundActive
-                }
-              >
+                        <small>
+                          {level.duration}s
+                        </small>
 
-                {isPlaying ? (
+                      </div>
 
-                  <Pause
-                    size={58}
-                    fill="currentColor"
-                  />
+                    )
+                  )}
 
-                ) : (
-
-                  <Play
-                    size={58}
-                    fill="currentColor"
-                  />
-
-                )}
-
-              </button>
+                </div>
 
 
-              <div className="seconds">
+                <div className="room-potential-score">
 
-                {!spotifyReady
-                  ? 'Preparando audio...'
-                  : `${currentLevel.duration}s`}
+                  <strong>
+                    {potentialPoints} pts
+                  </strong>
+
+
+                  <span>
+                    potenciales
+                  </span>
+
+                </div>
+
+
+                <button
+                  className={
+                    `play-button ${
+                      audioStarting
+                        ? 'audio-starting'
+                        : ''
+                    }`
+                  }
+                  onClick={
+                    togglePlay
+                  }
+                  disabled={
+                    !spotifyReady ||
+                    !effectiveRoundActive
+                  }
+                >
+
+                  {isPlaying ? (
+
+                    <Pause
+                      size={58}
+                      fill="currentColor"
+                    />
+
+                  ) : (
+
+                    <Play
+                      size={58}
+                      fill="currentColor"
+                    />
+
+                  )}
+
+                </button>
+
+
+                <div className="seconds">
+
+                  {!spotifyReady
+                    ? 'Preparando audio...'
+                    : `${currentLevel.duration}s`}
+
+                </div>
 
               </div>
 
 
-              <div className="guess-area">
+              <div className="guess-area room-mobile-controls">
 
                 <div className="autocomplete">
 
@@ -2617,8 +2637,16 @@ export default function RoomGamePage() {
 
 
                   <button
-                    className="skip-inline-btn"
-                    onClick={skip}
+                    className={
+                      `skip-inline-btn ${
+                        isLastLevel
+                          ? 'give-up'
+                          : ''
+                      }`
+                    }
+                    onClick={
+                      passLevel
+                    }
                     disabled={
                       !effectiveRoundActive
                     }
@@ -2626,7 +2654,10 @@ export default function RoomGamePage() {
 
                     <SkipForward />
 
-                    Saltar
+
+                    {isLastLevel
+                      ? 'Rendirse'
+                      : 'Pasar nivel'}
 
                   </button>
 
