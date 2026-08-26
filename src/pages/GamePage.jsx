@@ -994,110 +994,17 @@ function stopSpotify() {
 }
 
 
-  function togglePlay() {
-
-  const controller =
-    getActiveController()
-
-
   if (
-    !controller ||
-    !spotifyReady ||
-    status !== 'playing'
-  ) {
-    return
-  }
+  activeAlreadyPlayed()
+) {
 
+  controller.restart()
 
-  /*
-  PAUSA MANUAL
-  */
+} else {
 
-  if (
-    audioStarting ||
-    isPlaying
-  ) {
+  markActiveAsPlayed()
 
-    forceStopSpotify()
-
-    return
-  }
-
-
-  /*
-  LIMPIAMOS CUALQUIER TIMER ANTERIOR
-  */
-
-  clearTimeout(
-    fallbackTimerRef.current
-  )
-
-  clearInterval(
-    playbackWatchdogRef.current
-  )
-
-
-  stoppingRef.current =
-    false
-
-  playingRequestRef.current =
-    true
-
-
-  const durationMs =
-    currentLevel.duration *
-    1000
-
-
-  targetDurationRef.current =
-    durationMs
-
-
-  setAudioStarting(true)
-
-  setIsPlaying(true)
-
-
-  /*
-  ======================================
-  IMPORTANTE
-  ======================================
-
-  El timer se crea ANTES de Spotify.
-
-  Así aunque playback_started nunca llegue,
-  la canción se corta sí o sí.
-  */
-
-  fallbackTimerRef.current =
-    setTimeout(
-      () => {
-
-        forceStopSpotify()
-
-      },
-      durationMs + 350
-    )
-
-
-  /*
-  REPRODUCCIÓN
-  */
-
-  if (
-    activeAlreadyPlayed()
-  ) {
-
-    controller.restart()
-
-    controller.play()
-
-  } else {
-
-    markActiveAsPlayed()
-
-    controller.play()
-  }
+  controller.play()
 }
 
 

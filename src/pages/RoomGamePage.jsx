@@ -1478,20 +1478,18 @@ function stopSpotify() {
 
 
     if (
-      hasPlayedCurrentSongRef.current
-    ) {
+  hasPlayedCurrentSongRef.current
+) {
 
-      controller.restart()
+  controller.restart()
 
-      controller.play()
+} else {
 
-    } else {
+  hasPlayedCurrentSongRef.current =
+    true
 
-      hasPlayedCurrentSongRef.current =
-        true
-
-      controller.play()
-    }
+  controller.play()
+}
   }
 
 
