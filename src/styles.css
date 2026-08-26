@@ -4054,3 +4054,516 @@ h2 {
     font-size: .72rem;
   }
 }
+/* =====================================
+   ROOM GAME - POLISH VISUAL
+   ===================================== */
+
+.room-unified-game {
+  width: min(680px, calc(100% - 32px));
+  margin: 0 auto;
+  padding-top: 32px;
+}
+
+
+/* -------------------------------------
+   CABECERA
+   ------------------------------------- */
+
+.room-unified-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 14px;
+
+  margin-bottom: 12px;
+}
+
+.room-unified-top > div:first-child {
+  min-width: 0;
+}
+
+.room-unified-code {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 5px 9px;
+
+  margin-bottom: 7px;
+
+  border-radius: 999px;
+
+  border: 1px solid rgba(255,255,255,.08);
+
+  background:
+    rgba(255,255,255,.045);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  font-size: .62rem;
+  font-weight: 800;
+
+  letter-spacing: .07em;
+  text-transform: uppercase;
+
+  color: rgba(255,255,255,.62);
+}
+
+.room-unified-top h1 {
+  margin: 0;
+
+  font-size: 1.45rem;
+  line-height: 1.08;
+  font-weight: 850;
+
+  letter-spacing: -.025em;
+}
+
+
+/* -------------------------------------
+   META: RONDA + PUNTOS
+   ------------------------------------- */
+
+.room-unified-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.room-unified-meta span,
+.room-unified-meta strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 32px;
+
+  padding: 0 10px;
+
+  border-radius: 999px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.08);
+
+  background:
+    rgba(255,255,255,.04);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.room-unified-meta span {
+  color:
+    rgba(255,255,255,.55);
+}
+
+.room-unified-meta strong {
+  color: #ff8a42;
+
+  border-color:
+    rgba(255,138,66,.18);
+
+  background:
+    rgba(255,138,66,.06);
+}
+
+
+/* -------------------------------------
+   TIMER GLASS
+   ------------------------------------- */
+
+.room-unified-timer {
+  width: fit-content;
+
+  margin:
+    0 auto
+    26px;
+
+  padding:
+    7px 15px;
+
+  border-radius: 999px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.10);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.07),
+      rgba(255,255,255,.025)
+    );
+
+  box-shadow:
+    inset 0 1px 0
+    rgba(255,255,255,.05);
+
+  backdrop-filter:
+    blur(14px);
+
+  -webkit-backdrop-filter:
+    blur(14px);
+
+  font-size: .76rem;
+  font-weight: 850;
+
+  letter-spacing: .02em;
+
+  color:
+    rgba(255,255,255,.82);
+}
+
+.room-unified-timer.danger {
+  color: #ff7272;
+
+  border-color:
+    rgba(255,90,90,.28);
+
+  background:
+    rgba(255,70,70,.06);
+}
+
+
+/* -------------------------------------
+   NIVEL + PLAY
+   ------------------------------------- */
+
+.room-unified-game .solo-levels {
+  margin-bottom: 34px;
+}
+
+.room-unified-game .solo-play {
+  box-shadow:
+    0 12px 38px
+    rgba(255,132,56,.15),
+    inset 0 1px 0
+    rgba(255,255,255,.12);
+}
+
+.room-unified-game .solo-duration {
+  margin-bottom: 30px;
+}
+
+
+/* -------------------------------------
+   INPUT
+   ------------------------------------- */
+
+.room-unified-game .solo-search {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.055),
+      rgba(255,255,255,.035)
+    );
+
+  box-shadow:
+    inset 0 1px 0
+    rgba(255,255,255,.035);
+}
+
+
+/* -------------------------------------
+   RESULTADO DE RONDA
+   ------------------------------------- */
+
+.room-unified-game .round-result-card {
+  width: min(100%, 500px);
+
+  margin:
+    18px auto
+    30px;
+
+  padding: 20px;
+
+  border-radius: 22px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.09);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.05),
+      rgba(255,255,255,.025)
+    );
+
+  box-shadow:
+    0 18px 45px
+    rgba(0,0,0,.18),
+    inset 0 1px 0
+    rgba(255,255,255,.04);
+}
+
+.room-unified-game
+.round-result-card > img {
+  width: 92px;
+  height: 92px;
+
+  border-radius: 16px;
+
+  object-fit: cover;
+
+  margin-bottom: 15px;
+
+  box-shadow:
+    0 12px 28px
+    rgba(0,0,0,.22);
+}
+
+.room-unified-game
+.round-result-card h2 {
+  margin:
+    5px 0
+    3px;
+
+  font-size: 1.2rem;
+  line-height: 1.15;
+
+  letter-spacing: -.02em;
+}
+
+.room-unified-game
+.round-result-card p {
+  margin:
+    0 0
+    12px;
+
+  color:
+    rgba(255,255,255,.58);
+
+  font-size: .88rem;
+}
+
+.room-unified-game
+.round-result-card svg {
+  margin-bottom: 4px;
+}
+
+.room-unified-game
+.round-earned {
+  display: inline-flex;
+
+  margin-top: 2px;
+
+  padding:
+    6px
+    10px;
+
+  border-radius: 999px;
+
+  background:
+    rgba(255,138,66,.08);
+
+  border:
+    1px solid
+    rgba(255,138,66,.18);
+
+  color: #ff8a42;
+
+  font-size: .82rem;
+  font-weight: 850;
+}
+
+.room-unified-game
+.room-finish-position {
+  margin-top: 9px;
+
+  font-size: .75rem;
+
+  color:
+    rgba(255,255,255,.48);
+}
+
+
+/* -------------------------------------
+   PROGRESO JUGADORES
+   ------------------------------------- */
+
+.room-unified-game
+.round-waiting {
+  margin-top: 16px;
+
+  padding:
+    9px 12px;
+
+  border-radius: 12px;
+
+  background:
+    rgba(255,255,255,.035);
+
+  color:
+    rgba(255,255,255,.55);
+
+  font-size: .76rem;
+}
+
+
+/* -------------------------------------
+   LISTAS
+   ------------------------------------- */
+
+.room-unified-game
+.room-correct-list,
+.room-unified-game
+.live-scoreboard {
+  border-radius: 20px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.08);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.04),
+      rgba(255,255,255,.02)
+    );
+
+  box-shadow:
+    inset 0 1px 0
+    rgba(255,255,255,.035);
+}
+
+.room-unified-game
+.room-correct-list h3,
+.room-unified-game
+.live-scoreboard h3 {
+  font-size: .92rem;
+
+  margin-bottom: 16px;
+}
+
+
+/* =====================================
+   MOBILE
+   ===================================== */
+
+@media (max-width: 700px) {
+
+  .room-unified-game {
+    width: calc(100% - 20px);
+
+    padding-top: 26px;
+  }
+
+
+  .room-unified-top {
+    grid-template-columns: 1fr;
+    gap: 10px;
+
+    margin-bottom: 10px;
+  }
+
+
+  .room-unified-top h1 {
+    font-size: 1.35rem;
+  }
+
+
+  .room-unified-code {
+    font-size: .58rem;
+
+    margin-bottom: 6px;
+  }
+
+
+  .room-unified-meta {
+    width: 100%;
+
+    justify-content: flex-start;
+  }
+
+
+  .room-unified-meta span,
+  .room-unified-meta strong {
+    min-height: 30px;
+
+    padding:
+      0
+      9px;
+
+    font-size: .68rem;
+  }
+
+
+  .room-unified-timer {
+    margin:
+      0
+      0
+      28px;
+
+    padding:
+      6px
+      12px;
+
+    font-size: .7rem;
+  }
+
+
+  .room-unified-game
+  .solo-levels {
+    margin-bottom: 34px;
+  }
+
+
+  .room-unified-game
+  .round-result-card {
+    margin-top: 12px;
+
+    padding: 16px;
+
+    border-radius: 19px;
+  }
+
+
+  .room-unified-game
+  .round-result-card > img {
+    width: 86px;
+    height: 86px;
+
+    border-radius: 14px;
+  }
+
+
+  .room-unified-game
+  .round-result-card h2 {
+    font-size: 1.12rem;
+  }
+
+
+  .room-unified-game
+  .room-correct-list,
+  .room-unified-game
+  .live-scoreboard {
+    border-radius: 18px;
+  }
+}
+.room-unified-code {
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  padding: 6px 10px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+}
+
+.room-unified-meta span,
+.room-unified-meta strong {
+  background: rgba(255,255,255,.05) !important;
+  border: 1px solid rgba(255,255,255,.1) !important;
+  border-radius: 999px !important;
+  padding: 7px 10px !important;
+}
+
+.room-unified-timer {
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 999px !important;
+  padding: 7px 14px !important;
+}
