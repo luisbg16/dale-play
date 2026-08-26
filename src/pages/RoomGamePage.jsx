@@ -31,7 +31,7 @@ import {
 
 
 const ROUND_SECONDS = 60
-const PREPARE_SECONDS = 3
+const PREPARE_SECONDS = 6
 const PENALTY_PER_MISTAKE = 50
 
 
@@ -99,6 +99,7 @@ function sameSong(song, guess) {
     return false
   }
 
+
   if (
     song.spotify_id &&
     guess.spotify_id &&
@@ -106,6 +107,7 @@ function sameSong(song, guess) {
   ) {
     return true
   }
+
 
   const songTitle =
     normalizeText(song.title)
@@ -118,6 +120,7 @@ function sameSong(song, guess) {
 
   const guessArtist =
     normalizeArtist(guess.artist)
+
 
   return (
     songTitle === guessTitle &&
@@ -137,9 +140,11 @@ function searchLibrary(
   const needle =
     normalizeText(search)
 
+
   if (!needle) {
     return []
   }
+
 
   return library
     .map(song => {
@@ -152,7 +157,9 @@ function searchLibrary(
       const combined =
         `${title} ${artist}`
 
+
       let score = 0
+
 
       if (title === needle) {
         score = 100
@@ -183,6 +190,7 @@ function searchLibrary(
         score = 50
       }
 
+
       return {
         song,
         score
@@ -205,21 +213,10 @@ function searchLibrary(
 
 
 function getPositionMultiplier(position) {
-  if (position === 1) {
-    return 100
-  }
-
-  if (position === 2) {
-    return 90
-  }
-
-  if (position === 3) {
-    return 80
-  }
-
-  if (position === 4) {
-    return 70
-  }
+  if (position === 1) return 100
+  if (position === 2) return 90
+  if (position === 3) return 80
+  if (position === 4) return 70
 
   return 60
 }
@@ -233,6 +230,7 @@ function formatTime(seconds) {
 
   const secs =
     seconds % 60
+
 
   return (
     `${String(mins).padStart(2, '0')}:` +
@@ -251,7 +249,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  DATOS
+  SALA
   =====================================
   */
 
@@ -275,6 +273,33 @@ export default function RoomGamePage() {
 
 
   /*
+  Este ref es MUY importante.
+
+  Nos dice cuál es la ronda verdadera
+  ahora mismo, sin depender de closures
+  viejos de React/Realtime.
+  */
+
+  const currentRoundRef =
+    useRef(0)
+
+
+  /*
+  =====================================
+  SINCRONIZACIÓN DE HORA
+  =====================================
+  */
+
+  const serverOffsetRef =
+    useRef(0)
+
+  const [
+    clockReady,
+    setClockReady
+  ] = useState(false)
+
+
+  /*
   =====================================
   JUEGO
   =====================================
@@ -291,6 +316,9 @@ export default function RoomGamePage() {
 
   const [roundDone, setRoundDone] =
     useState(false)
+
+  const roundDoneRef =
+    useRef(false)
 
   const [roundPoints, setRoundPoints] =
     useState(0)
@@ -313,7 +341,7 @@ export default function RoomGamePage() {
   const [
     preparationLeft,
     setPreparationLeft
-  ] = useState(0)
+  ] = useState(PREPARE_SECONDS)
 
   const [
     roundActive,
@@ -331,7 +359,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  BÚSQUEDA
+  BUSCADOR
   =====================================
   */
 
@@ -417,6 +445,7 @@ export default function RoomGamePage() {
   const currentLevel =
     LEVELS[levelIndex]
 
+
   const isLastLevel =
     levelIndex ===
     LEVELS.length - 1
@@ -433,12 +462,136 @@ export default function RoomGamePage() {
 
   /*
   =====================================
+  MANTENER REFS ACTUALIZADOS
+  =====================================
+  */
+
+  useEffect(() => {
+    roundDoneRef.current =
+      roundDone
+  }, [
+    roundDone
+  ])
+
+
+  useEffect(() => {
+    if (
+      room?.current_round
+    ) {
+      currentRoundRef.current =
+        room.current_round
+    }
+  }, [
+    room?.current_round
+  ])
+
+
+  /*
+  =====================================
+  HORA DEL SERVIDOR
+  =====================================
+  */
+
+  async function syncServerClock() {
+    try {
+      /*
+      Medimos antes y después para
+      compensar un poquito la latencia.
+      */
+
+      const before =
+        Date.now()
+
+
+      const {
+        data,
+        error
+      } =
+        await supabase
+          .rpc(
+            'get_server_time'
+          )
+
+
+      const after =
+        Date.now()
+
+
+      if (error) {
+        throw error
+      }
+
+
+      const serverMs =
+        new Date(data)
+          .getTime()
+
+
+      /*
+      Aproximamos el instante local
+      en que respondió el servidor
+      usando el punto medio.
+      */
+
+      const localMiddle =
+        before +
+        (
+          after -
+          before
+        ) / 2
+
+
+      serverOffsetRef.current =
+        serverMs -
+        localMiddle
+
+
+      setClockReady(
+        true
+      )
+
+
+    } catch (error) {
+      console.error(
+        'No se pudo sincronizar reloj:',
+        error
+      )
+
+
+      /*
+      Si falla, usamos reloj local
+      como fallback.
+      */
+
+      serverOffsetRef.current =
+        0
+
+      setClockReady(
+        true
+      )
+    }
+  }
+
+
+  function getSyncedNow() {
+    return (
+      Date.now() +
+      serverOffsetRef.current
+    )
+  }
+
+
+  /*
+  =====================================
   INICIO
   =====================================
   */
 
   useEffect(() => {
+    syncServerClock()
+
     loadInitial()
+
 
     loadSpotifyIframeApi()
       .then(IFrameAPI => {
@@ -453,8 +606,30 @@ export default function RoomGamePage() {
         )
       })
 
+
+    /*
+    Volvemos a sincronizar cada minuto.
+
+    Así si el navegador estuvo dormido
+    o cambió algo en el dispositivo,
+    corregimos el desfase.
+    */
+
+    const clockInterval =
+      setInterval(
+        () => {
+          syncServerClock()
+        },
+        60000
+      )
+
+
     return () => {
       stopSpotify()
+
+      clearInterval(
+        clockInterval
+      )
 
       clearTimeout(
         searchTimer.current
@@ -528,6 +703,10 @@ export default function RoomGamePage() {
 
       return
     }
+
+
+    currentRoundRef.current =
+      roomData.current_round || 0
 
 
     setPlayer(
@@ -629,7 +808,9 @@ export default function RoomGamePage() {
     }
 
 
-    setSong(data)
+    setSong(
+      data
+    )
   }
 
 
@@ -684,10 +865,16 @@ export default function RoomGamePage() {
     currentPlayerId = null
   ) {
     if (!roundNumber) {
-      setAnswers([])
-
       return
     }
+
+
+    /*
+    Guardamos la ronda que solicitamos.
+    */
+
+    const requestedRound =
+      Number(roundNumber)
 
 
     const {
@@ -703,7 +890,7 @@ export default function RoomGamePage() {
         )
         .eq(
           'round_number',
-          roundNumber
+          requestedRound
         )
         .order(
           'created_at',
@@ -720,71 +907,133 @@ export default function RoomGamePage() {
     }
 
 
+    /*
+    MUY IMPORTANTE:
+
+    Si mientras esperábamos a Supabase
+    ya cambió la ronda, ignoramos esta
+    respuesta completamente.
+
+    Esto evita el bug:
+    "me apareció como rendido".
+    */
+
+    if (
+      requestedRound !==
+      Number(
+        currentRoundRef.current
+      )
+    ) {
+      return
+    }
+
+
     const list =
       data || []
 
 
-    setAnswers(list)
+    setAnswers(
+      list
+    )
 
 
-    if (
-      currentPlayerId
-    ) {
-      const ownAnswer =
-        list.find(
-          item =>
-            item.player_id ===
-            currentPlayerId
-        )
+    if (!currentPlayerId) {
+      return
+    }
 
 
-      if (ownAnswer) {
-        setRoundDone(
-          true
-        )
-
-        setRoundPoints(
-          ownAnswer.points || 0
-        )
-
-
-        if (
-          ownAnswer.correct
-        ) {
-          const ownTime =
-            new Date(
-              ownAnswer.created_at
-            ).getTime()
+    const ownAnswer =
+      list.find(
+        item =>
+          item.player_id ===
+            currentPlayerId &&
+          Number(
+            item.round_number
+          ) ===
+            requestedRound
+      )
 
 
-          const previous =
-            list.filter(
-              item =>
-                item.correct &&
-                new Date(
-                  item.created_at
-                ).getTime() <=
-                  ownTime
-            )
+    /*
+    Solo cerramos la ronda si existe
+    una respuesta DEL JUGADOR y DE
+    ESTA RONDA EXACTA.
+    */
+
+    if (ownAnswer) {
+      roundDoneRef.current =
+        true
+
+      setRoundDone(
+        true
+      )
+
+      setRoundPoints(
+        ownAnswer.points || 0
+      )
 
 
-          setCorrectPosition(
-            previous.length
+      if (
+        ownAnswer.correct
+      ) {
+        const ownTime =
+          new Date(
+            ownAnswer.created_at
+          ).getTime()
+
+
+        const previous =
+          list.filter(
+            item =>
+              item.correct &&
+              new Date(
+                item.created_at
+              ).getTime() <=
+                ownTime
           )
 
-        } else {
-          setCorrectPosition(
-            0
-          )
-        }
+
+        setCorrectPosition(
+          previous.length
+        )
+
+      } else {
+        setCorrectPosition(
+          0
+        )
       }
+
+
+    } else {
+      /*
+      Antes esto faltaba.
+
+      Si NO hay respuesta propia
+      para esta ronda, entonces el
+      jugador DEBE poder jugar.
+      */
+
+      roundDoneRef.current =
+        false
+
+      setRoundDone(
+        false
+      )
+
+      setRoundPoints(
+        0
+      )
+
+      setCorrectPosition(
+        0
+      )
     }
   }
 
 
   /*
   =====================================
-  PREPARAR SPOTIFY
+  SPOTIFY
   =====================================
   */
 
@@ -853,11 +1102,6 @@ export default function RoomGamePage() {
       const uri =
         `spotify:track:${spotifyId}`
 
-
-      /*
-      Controller ya existe.
-      Cargamos siempre desde 0.
-      */
 
       if (
         controllerRef.current
@@ -930,9 +1174,7 @@ export default function RoomGamePage() {
 
 
     } catch (error) {
-      console.error(
-        error
-      )
+      console.error(error)
 
 
       setMessage(
@@ -1135,6 +1377,11 @@ export default function RoomGamePage() {
       )
 
 
+    /*
+    Esta es la lógica que ya comprobamos
+    que funciona bien en iPhone.
+    */
+
     if (
       hasPlayedCurrentSongRef.current
     ) {
@@ -1171,6 +1418,13 @@ export default function RoomGamePage() {
           `daleplay-game-${roomId}`
         )
 
+
+        /*
+        ---------------------------------
+        CAMBIOS DE SALA
+        ---------------------------------
+        */
+
         .on(
           'postgres_changes',
           {
@@ -1185,9 +1439,21 @@ export default function RoomGamePage() {
               payload.new
 
 
+            const newRound =
+              Number(
+                updated.current_round
+              )
+
+
+            const oldRound =
+              Number(
+                currentRoundRef.current
+              )
+
+
             const roundChanged =
-              updated.current_round !==
-              room.current_round
+              newRound !==
+              oldRound
 
 
             const songChanged =
@@ -1198,6 +1464,17 @@ export default function RoomGamePage() {
             const statusChanged =
               updated.status !==
               room.status
+
+
+            /*
+            ACTUALIZAMOS EL REF PRIMERO.
+
+            Esto evita que una petición vieja
+            gane la carrera.
+            */
+
+            currentRoundRef.current =
+              newRound
 
 
             setRoom(
@@ -1212,17 +1489,9 @@ export default function RoomGamePage() {
               stopSpotify()
 
 
-              await Promise.all([
-                loadPlayers(
-                  roomId
-                ),
-
-                loadAnswers(
-                  roomId,
-                  updated.current_round,
-                  player?.player_id
-                )
-              ])
+              await loadPlayers(
+                roomId
+              )
 
 
               return
@@ -1251,14 +1520,26 @@ export default function RoomGamePage() {
               }
 
 
+              /*
+              Cargamos SOLO respuestas de
+              la nueva ronda.
+              */
+
               await loadAnswers(
                 updated.id,
-                updated.current_round,
+                newRound,
                 player?.player_id
               )
             }
           }
         )
+
+
+        /*
+        ---------------------------------
+        JUGADORES
+        ---------------------------------
+        */
 
         .on(
           'postgres_changes',
@@ -1276,6 +1557,13 @@ export default function RoomGamePage() {
           }
         )
 
+
+        /*
+        ---------------------------------
+        RESPUESTAS
+        ---------------------------------
+        */
+
         .on(
           'postgres_changes',
           {
@@ -1285,10 +1573,33 @@ export default function RoomGamePage() {
             filter:
               `room_id=eq.${roomId}`
           },
-          () => {
+          payload => {
+            /*
+            Ignoramos eventos de rondas
+            anteriores.
+            */
+
+            const eventRound =
+              Number(
+                payload.new?.round_number ??
+                payload.old?.round_number ??
+                0
+              )
+
+
+            if (
+              eventRound !==
+              Number(
+                currentRoundRef.current
+              )
+            ) {
+              return
+            }
+
+
             loadAnswers(
               roomId,
-              room.current_round,
+              currentRoundRef.current,
               player?.player_id
             )
 
@@ -1298,6 +1609,7 @@ export default function RoomGamePage() {
             )
           }
         )
+
 
         .subscribe()
 
@@ -1309,7 +1621,6 @@ export default function RoomGamePage() {
     }
   }, [
     room?.id,
-    room?.current_round,
     room?.current_song_id,
     room?.status,
     player?.player_id
@@ -1318,15 +1629,15 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  TIMER
+  TIMER SINCRONIZADO
   =====================================
   */
 
   useEffect(() => {
     if (
       !room?.round_started_at ||
-      room.status !==
-        'playing'
+      room.status !== 'playing' ||
+      !clockReady
     ) {
       return
     }
@@ -1341,12 +1652,21 @@ export default function RoomGamePage() {
             ).getTime()
 
 
+          /*
+          AQUÍ ESTÁ LA DIFERENCIA:
+
+          Ya no usamos Date.now() solo.
+          Usamos Date.now() corregido contra
+          la hora de Supabase.
+          */
+
           const now =
-            Date.now()
+            getSyncedNow()
 
 
           const beforeStart =
-            start - now
+            start -
+            now
 
 
           if (
@@ -1384,6 +1704,7 @@ export default function RoomGamePage() {
           setPreparationLeft(
             0
           )
+
 
           setRoundActive(
             true
@@ -1429,7 +1750,7 @@ export default function RoomGamePage() {
 
 
             if (
-              !roundDone &&
+              !roundDoneRef.current &&
               !timeoutSubmittedRef.current
             ) {
               timeoutSubmittedRef.current =
@@ -1444,7 +1765,7 @@ export default function RoomGamePage() {
             }
           }
         },
-        250
+        100
       )
 
 
@@ -1456,13 +1777,13 @@ export default function RoomGamePage() {
   }, [
     room?.round_started_at,
     room?.status,
-    roundDone
+    clockReady
   ])
 
 
   /*
   =====================================
-  BUSCADOR
+  BUSCADOR LOCAL
   =====================================
   */
 
@@ -1555,7 +1876,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  PASAR NIVEL
+  PASAR NIVEL / RENDIRSE
   =====================================
   */
 
@@ -1701,7 +2022,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  TERMINAR RONDA DEL JUGADOR
+  TERMINAR JUGADOR
   =====================================
   */
 
@@ -1712,15 +2033,18 @@ export default function RoomGamePage() {
     wrongCountOverride = null
   ) {
     if (
-      roundDone &&
+      roundDoneRef.current &&
       !timeout
     ) {
       return
     }
 
 
-    stopSpotify()
+    roundDoneRef.current =
+      true
 
+
+    stopSpotify()
 
     setRoundDone(
       true
@@ -1730,6 +2054,12 @@ export default function RoomGamePage() {
     const finalWrongCount =
       wrongCountOverride ??
       wrongCount
+
+
+    const roundBeingSubmitted =
+      Number(
+        currentRoundRef.current
+      )
 
 
     try {
@@ -1748,7 +2078,7 @@ export default function RoomGamePage() {
                 player.player_id,
 
               p_round_number:
-                room.current_round,
+                roundBeingSubmitted,
 
               p_answer_title:
                 guessData?.title ||
@@ -1776,6 +2106,22 @@ export default function RoomGamePage() {
 
       if (error) {
         throw error
+      }
+
+
+      /*
+      Si mientras respondíamos cambió
+      la ronda, ya no actualizamos la UI
+      con información vieja.
+      */
+
+      if (
+        roundBeingSubmitted !==
+        Number(
+          currentRoundRef.current
+        )
+      ) {
+        return
       }
 
 
@@ -1827,7 +2173,7 @@ export default function RoomGamePage() {
       await Promise.all([
         loadAnswers(
           room.id,
-          room.current_round,
+          roundBeingSubmitted,
           player.player_id
         ),
 
@@ -1838,8 +2184,19 @@ export default function RoomGamePage() {
 
 
     } catch (error) {
-      console.error(
-        error
+      console.error(error)
+
+
+      /*
+      Si falló realmente la respuesta,
+      permitimos volver a intentar.
+      */
+
+      roundDoneRef.current =
+        false
+
+      setRoundDone(
+        false
       )
 
 
@@ -1853,7 +2210,7 @@ export default function RoomGamePage() {
 
   /*
   =====================================
-  RESET
+  RESET RONDA
   =====================================
   */
 
@@ -1862,6 +2219,14 @@ export default function RoomGamePage() {
 
 
     hasPlayedCurrentSongRef.current =
+      false
+
+
+    roundDoneRef.current =
+      false
+
+
+    timeoutSubmittedRef.current =
       false
 
 
@@ -1916,10 +2281,6 @@ export default function RoomGamePage() {
     setSpotifyReady(
       false
     )
-
-
-    timeoutSubmittedRef.current =
-      false
   }
 
 
@@ -2003,14 +2364,12 @@ export default function RoomGamePage() {
       ]
 
 
-    const startAt =
-      new Date(
-        Date.now() +
-        PREPARE_SECONDS *
-          1000
-      )
-        .toISOString()
+    /*
+    No necesitamos calcular hora.
 
+    El trigger de Supabase reemplaza
+    round_started_at automáticamente.
+    */
 
     const {
       error
@@ -2024,8 +2383,14 @@ export default function RoomGamePage() {
           current_song_id:
             nextSong.id,
 
+          /*
+          Le mandamos cualquier valor.
+          El servidor lo sustituye.
+          */
+
           round_started_at:
-            startAt
+            new Date()
+              .toISOString()
         })
         .eq(
           'id',
@@ -2093,12 +2458,16 @@ export default function RoomGamePage() {
         ]
 
 
-      const startAt =
-        new Date(
-          Date.now() +
-          PREPARE_SECONDS *
-            1000
-        )
+      /*
+      La función vieja todavía pide
+      fecha.
+
+      Está bien: el trigger de Supabase
+      la reemplazará por la hora oficial.
+      */
+
+      const dummyStart =
+        new Date()
           .toISOString()
 
 
@@ -2119,7 +2488,7 @@ export default function RoomGamePage() {
                 firstSong.id,
 
               p_round_started_at:
-                startAt
+                dummyStart
             }
           )
 
@@ -2129,30 +2498,8 @@ export default function RoomGamePage() {
       }
 
 
-      resetRound()
-
-
-      await Promise.all([
-        loadPlayers(
-          room.id
-        ),
-
-        loadAnswers(
-          room.id,
-          1,
-          player.player_id
-        ),
-
-        loadSong(
-          firstSong.id
-        )
-      ])
-
-
     } catch (error) {
-      console.error(
-        error
-      )
+      console.error(error)
 
 
       setMessage(
@@ -2178,6 +2525,12 @@ export default function RoomGamePage() {
     answers
       .filter(
         item =>
+          Number(
+            item.round_number
+          ) ===
+            Number(
+              currentRoundRef.current
+            ) &&
           item.correct
       )
       .sort(
@@ -2191,9 +2544,21 @@ export default function RoomGamePage() {
       )
 
 
+  const currentRoundAnswers =
+    answers.filter(
+      item =>
+        Number(
+          item.round_number
+        ) ===
+          Number(
+            currentRoundRef.current
+          )
+    )
+
+
   const everyoneFinished =
     players.length > 0 &&
-    answers.length >=
+    currentRoundAnswers.length >=
       players.length
 
 
@@ -2434,7 +2799,7 @@ export default function RoomGamePage() {
 
           {/*
           =====================================
-          HEADER
+          CABECERA
           =====================================
           */}
 
@@ -2470,213 +2835,327 @@ export default function RoomGamePage() {
 
           {/*
           =====================================
-          TIMER
-          =====================================
-          */}
-
-          <div
-            className={
-              `room-unified-timer ${
-                timeLeft <= 10 &&
-                effectiveRoundActive
-                  ? 'danger'
-                  : ''
-              }`
-            }
-          >
-
-            {preparationLeft > 0
-              ? `Empieza en ${preparationLeft}`
-              : formatTime(
-                  timeLeft
-                )}
-
-          </div>
-
-
-          {/*
-          =====================================
-          PREPARANDO
+          PREPARACIÓN GRANDE
           =====================================
           */}
 
           {preparationLeft > 0 &&
-            !roundDone && (
+            !roundDone ? (
 
-            <div className="room-unified-preparing">
-              Preparando canción...
+            <div className="room-countdown-screen">
+
+              <span>
+                RONDA {room.current_round}
+              </span>
+
+              <small>
+                EMPIEZA EN
+              </small>
+
+              <strong
+                key={
+                  preparationLeft
+                }
+              >
+                {preparationLeft}
+              </strong>
+
             </div>
 
-          )}
-
-
-          {/*
-          =====================================
-          JUGANDO
-          =====================================
-          */}
-
-          {!roundDone &&
-            preparationLeft === 0 && (
+          ) : (
 
             <>
 
 
-              <div className="solo-levels">
+              {/*
+              =====================================
+              TIMER DE RONDA
+              =====================================
+              */}
 
-                {LEVELS.map(
-                  (
-                    level,
-                    index
-                  ) => (
+              {!roundDone && (
 
-                    <div
-                      key={level.id}
-                      className={
-                        `solo-level ${
-                          index === levelIndex
-                            ? 'active'
-                            : ''
-                        } ${
-                          index < levelIndex
-                            ? 'used'
-                            : ''
-                        }`
-                      }
-                    >
+                <div
+                  className={
+                    `room-unified-timer ${
+                      timeLeft <= 10 &&
+                      effectiveRoundActive
+                        ? 'danger'
+                        : ''
+                    }`
+                  }
+                >
 
-                      <strong>
-                        {level.label}
-                      </strong>
+                  {formatTime(
+                    timeLeft
+                  )}
 
-                      <small>
-                        {level.duration}s
-                      </small>
+                </div>
+
+              )}
+
+
+              {/*
+              =====================================
+              JUGANDO
+              =====================================
+              */}
+
+              {!roundDone && (
+
+                <>
+
+
+                  <div className="solo-levels">
+
+                    {LEVELS.map(
+                      (
+                        level,
+                        index
+                      ) => (
+
+                        <div
+                          key={level.id}
+                          className={
+                            `solo-level ${
+                              index === levelIndex
+                                ? 'active'
+                                : ''
+                            } ${
+                              index < levelIndex
+                                ? 'used'
+                                : ''
+                            }`
+                          }
+                        >
+
+                          <strong>
+                            {level.label}
+                          </strong>
+
+                          <small>
+                            {level.duration}s
+                          </small>
+
+                        </div>
+
+                      )
+                    )}
+
+                  </div>
+
+
+                  <button
+                    className="solo-play"
+                    onClick={
+                      togglePlay
+                    }
+                    disabled={
+                      !spotifyReady ||
+                      !effectiveRoundActive
+                    }
+                  >
+
+                    {isPlaying ? (
+
+                      <Pause
+                        size={52}
+                        fill="currentColor"
+                      />
+
+                    ) : (
+
+                      <Play
+                        size={52}
+                        fill="currentColor"
+                      />
+
+                    )}
+
+                  </button>
+
+
+                  <div className="solo-duration">
+
+                    {!spotifyReady
+                      ? 'Preparando audio...'
+                      : `${currentLevel.duration}s · ${potentialPoints} pts`}
+
+                  </div>
+
+
+                  <div className="solo-controls">
+
+                    <div className="autocomplete">
+
+                      <input
+                        className="solo-search"
+                        value={query}
+                        placeholder="Busca una canción..."
+                        disabled={
+                          !effectiveRoundActive
+                        }
+                        onChange={
+                          event => {
+                            setQuery(
+                              event.target.value
+                            )
+
+                            setSelectedGuess(
+                              null
+                            )
+                          }
+                        }
+                      />
+
+
+                      {searching && (
+
+                        <div className="spotify-searching">
+                          Buscando...
+                        </div>
+
+                      )}
+
+
+                      {searchResults.length > 0 && (
+
+                        <div className="suggestions spotify-game-results">
+
+                          {searchResults.map(
+                            track => (
+
+                              <button
+                                key={track.id}
+                                type="button"
+                                onClick={
+                                  () =>
+                                    selectGuess(
+                                      track
+                                    )
+                                }
+                              >
+
+                                {track.album_image_url && (
+
+                                  <img
+                                    src={
+                                      track.album_image_url
+                                    }
+                                    alt=""
+                                  />
+
+                                )}
+
+
+                                <span className="guess-track-info">
+
+                                  <b>
+                                    {track.title}
+                                  </b>
+
+                                  <small>
+                                    {track.artist}
+                                  </small>
+
+                                </span>
+
+                              </button>
+
+                            )
+                          )}
+
+                        </div>
+
+                      )}
 
                     </div>
 
-                  )
-                )}
 
-              </div>
+                    <div className="solo-actions">
 
-
-              <button
-                className="solo-play"
-                onClick={
-                  togglePlay
-                }
-                disabled={
-                  !spotifyReady ||
-                  !effectiveRoundActive
-                }
-              >
-
-                {isPlaying ? (
-
-                  <Pause
-                    size={52}
-                    fill="currentColor"
-                  />
-
-                ) : (
-
-                  <Play
-                    size={52}
-                    fill="currentColor"
-                  />
-
-                )}
-
-              </button>
+                      <button
+                        className="guess-btn"
+                        onClick={
+                          guess
+                        }
+                        disabled={
+                          !effectiveRoundActive ||
+                          !selectedGuess
+                        }
+                      >
+                        Adivinar
+                      </button>
 
 
-              <div className="solo-duration">
+                      <button
+                        className={
+                          `skip-inline-btn ${
+                            isLastLevel
+                              ? 'give-up'
+                              : ''
+                          }`
+                        }
+                        onClick={
+                          passLevel
+                        }
+                        disabled={
+                          !effectiveRoundActive
+                        }
+                      >
 
-                {!spotifyReady
-                  ? 'Preparando audio...'
-                  : `${currentLevel.duration}s · ${potentialPoints} pts`}
+                        <SkipForward size={17} />
 
-              </div>
+                        {isLastLevel
+                          ? 'Rendirse'
+                          : 'Pasar nivel'}
 
+                      </button>
 
-              <div className="solo-controls">
+                    </div>
 
-                <div className="autocomplete">
-
-                  <input
-                    className="solo-search"
-                    value={query}
-                    placeholder="Busca una canción..."
-                    disabled={
-                      !effectiveRoundActive
-                    }
-                    onChange={
-                      event => {
-                        setQuery(
-                          event.target.value
-                        )
-
-                        setSelectedGuess(
-                          null
-                        )
-                      }
-                    }
-                  />
+                  </div>
 
 
-                  {searching && (
+                  {message && (
 
-                    <div className="spotify-searching">
-                      Buscando...
+                    <div className="message">
+                      {message}
                     </div>
 
                   )}
 
 
-                  {searchResults.length > 0 && (
+                  {attempts.length > 0 && (
 
-                    <div className="suggestions spotify-game-results">
+                    <div className="solo-attempts">
 
-                      {searchResults.map(
-                        track => (
+                      {attempts.map(
+                        (
+                          item,
+                          index
+                        ) => (
 
-                          <button
-                            key={track.id}
-                            type="button"
-                            onClick={
-                              () =>
-                                selectGuess(
-                                  track
-                                )
+                          <div
+                            key={index}
+                            className={
+                              item.correct
+                                ? 'correct'
+                                : ''
                             }
                           >
 
-                            {track.album_image_url && (
-
-                              <img
-                                src={
-                                  track.album_image_url
-                                }
-                                alt=""
-                              />
-
-                            )}
-
-
-                            <span className="guess-track-info">
-
-                              <b>
-                                {track.title}
-                              </b>
-
-                              <small>
-                                {track.artist}
-                              </small>
-
+                            <span>
+                              {item.correct
+                                ? '✓'
+                                : '×'}
                             </span>
 
-                          </button>
+                            <span>
+                              {item.text}
+                            </span>
+
+                          </div>
 
                         )
                       )}
@@ -2685,95 +3164,135 @@ export default function RoomGamePage() {
 
                   )}
 
-                </div>
-
-
-                <div className="solo-actions">
-
-                  <button
-                    className="guess-btn"
-                    onClick={
-                      guess
-                    }
-                    disabled={
-                      !effectiveRoundActive ||
-                      !selectedGuess
-                    }
-                  >
-                    Adivinar
-                  </button>
-
-
-                  <button
-                    className={
-                      `skip-inline-btn ${
-                        isLastLevel
-                          ? 'give-up'
-                          : ''
-                      }`
-                    }
-                    onClick={
-                      passLevel
-                    }
-                    disabled={
-                      !effectiveRoundActive
-                    }
-                  >
-
-                    <SkipForward size={17} />
-
-                    {isLastLevel
-                      ? 'Rendirse'
-                      : 'Pasar nivel'}
-
-                  </button>
-
-                </div>
-
-              </div>
-
-
-              {message && (
-
-                <div className="message">
-                  {message}
-                </div>
+                </>
 
               )}
 
 
-              {attempts.length > 0 && (
+              {/*
+              =====================================
+              RESULTADO
+              =====================================
+              */}
 
-                <div className="solo-attempts">
+              {roundDone && (
 
-                  {attempts.map(
-                    (
-                      item,
-                      index
-                    ) => (
+                <div className="round-result-card">
 
-                      <div
-                        key={index}
-                        className={
-                          item.correct
-                            ? 'correct'
-                            : ''
-                        }
-                      >
+                  {song.album_image_url && (
 
-                        <span>
-                          {item.correct
-                            ? '✓'
-                            : '×'}
-                        </span>
+                    <img
+                      src={
+                        song.album_image_url
+                      }
+                      alt=""
+                    />
 
-                        <span>
-                          {item.text}
-                        </span>
+                  )}
 
-                      </div>
 
-                    )
+                  {roundPoints > 0 ? (
+
+                    <>
+
+                      <CheckCircle2
+                        size={30}
+                      />
+
+                      <h2>
+                        {song.title}
+                      </h2>
+
+                      <p>
+                        {song.artist}
+                      </p>
+
+                      <strong className="round-earned">
+                        +{roundPoints} pts
+                      </strong>
+
+
+                      {correctPosition > 0 && (
+
+                        <div className="room-finish-position">
+
+                          #{correctPosition}
+                          {' · '}
+                          {getPositionMultiplier(
+                            correctPosition
+                          )}
+                          %
+
+                        </div>
+
+                      )}
+
+                    </>
+
+                  ) : (
+
+                    <>
+
+                      <X size={30} />
+
+                      <h2>
+                        {song.title}
+                      </h2>
+
+                      <p>
+                        {song.artist}
+                      </p>
+
+                    </>
+
+                  )}
+
+
+                  <div className="round-waiting">
+
+                    {currentRoundAnswers.length}
+                    {' de '}
+                    {players.length}
+                    {' terminaron'}
+
+                  </div>
+
+
+                  {player.is_host ? (
+
+                    <button
+                      className="primary room-next-round-btn"
+                      disabled={
+                        !hostCanContinue
+                      }
+                      onClick={
+                        nextRound
+                      }
+                    >
+
+                      <ArrowRight size={18} />
+
+                      {
+                        room.current_round >=
+                        room.total_rounds
+                          ? 'Ver resultados'
+                          : hostCanContinue
+                            ? 'Siguiente ronda'
+                            : `Esperando (${currentRoundAnswers.length}/${players.length})`
+                      }
+
+                    </button>
+
+                  ) : (
+
+                    <p className="muted">
+
+                      {hostCanContinue
+                        ? 'Esperando al host...'
+                        : 'Esperando a los demás...'}
+
+                    </p>
+
                   )}
 
                 </div>
@@ -2787,248 +3306,119 @@ export default function RoomGamePage() {
 
           {/*
           =====================================
-          RESULTADO DE RONDA
-          =====================================
-          */}
-
-          {roundDone && (
-
-            <div className="round-result-card">
-
-              {song.album_image_url && (
-
-                <img
-                  src={
-                    song.album_image_url
-                  }
-                  alt=""
-                />
-
-              )}
-
-
-              {roundPoints > 0 ? (
-
-                <>
-
-                  <CheckCircle2
-                    size={30}
-                  />
-
-                  <h2>
-                    {song.title}
-                  </h2>
-
-                  <p>
-                    {song.artist}
-                  </p>
-
-                  <strong className="round-earned">
-                    +{roundPoints} pts
-                  </strong>
-
-
-                  {correctPosition > 0 && (
-
-                    <div className="room-finish-position">
-
-                      #{correctPosition}
-                      {' · '}
-                      {getPositionMultiplier(
-                        correctPosition
-                      )}
-                      %
-
-                    </div>
-
-                  )}
-
-                </>
-
-              ) : (
-
-                <>
-
-                  <X size={30} />
-
-                  <h2>
-                    {song.title}
-                  </h2>
-
-                  <p>
-                    {song.artist}
-                  </p>
-
-                </>
-
-              )}
-
-
-              <div className="round-waiting">
-
-                {answers.length}
-                {' de '}
-                {players.length}
-                {' terminaron'}
-
-              </div>
-
-
-              {player.is_host ? (
-
-                <button
-                  className="primary room-next-round-btn"
-                  disabled={
-                    !hostCanContinue
-                  }
-                  onClick={
-                    nextRound
-                  }
-                >
-
-                  <ArrowRight size={18} />
-
-                  {
-                    room.current_round >=
-                    room.total_rounds
-                      ? 'Ver resultados'
-                      : hostCanContinue
-                        ? 'Siguiente ronda'
-                        : `Esperando (${answers.length}/${players.length})`
-                  }
-
-                </button>
-
-              ) : (
-
-                <p className="muted">
-
-                  {hostCanContinue
-                    ? 'Esperando al host...'
-                    : 'Esperando a los demás...'}
-
-                </p>
-
-              )}
-
-            </div>
-
-          )}
-
-
-          {/*
-          =====================================
           ACERTARON
           =====================================
           */}
 
-          <div className="room-correct-list">
+          {preparationLeft === 0 && (
 
-            <h3>
-              Acertaron esta ronda
-            </h3>
+            <>
 
+              <div className="room-correct-list">
 
-            {!correctAnswers.length && (
-
-              <p className="muted">
-                Todavía nadie.
-              </p>
-
-            )}
+                <h3>
+                  Acertaron esta ronda
+                </h3>
 
 
-            {correctAnswers.map(
-              (
-                answer,
-                index
-              ) => {
-                const answerPlayer =
-                  players.find(
-                    item =>
-                      item.id ===
-                      answer.player_id
+                {!correctAnswers.length && (
+
+                  <p className="muted">
+                    Todavía nadie.
+                  </p>
+
+                )}
+
+
+                {correctAnswers.map(
+                  (
+                    answer,
+                    index
+                  ) => {
+                    const answerPlayer =
+                      players.find(
+                        item =>
+                          item.id ===
+                          answer.player_id
+                      )
+
+
+                    return (
+
+                      <div
+                        className="room-correct-row"
+                        key={answer.id}
+                      >
+
+                        <span>
+                          #{index + 1}
+                        </span>
+
+                        <strong>
+                          {answerPlayer
+                            ?.player_name ||
+                            'Jugador'}
+                        </strong>
+
+                        <b>
+                          +{answer.points}
+                        </b>
+
+                      </div>
+
+                    )
+                  }
+                )}
+
+              </div>
+
+
+              <div className="live-scoreboard">
+
+                <h3>
+                  Marcador
+                </h3>
+
+
+                {[...players]
+                  .sort(
+                    (a, b) =>
+                      b.score -
+                      a.score
                   )
+                  .map(
+                    (
+                      item,
+                      index
+                    ) => (
 
+                      <div
+                        className="live-score-row"
+                        key={item.id}
+                      >
 
-                return (
+                        <span>
+                          #{index + 1}
+                        </span>
 
-                  <div
-                    className="room-correct-row"
-                    key={answer.id}
-                  >
+                        <strong>
+                          {item.player_name}
+                        </strong>
 
-                    <span>
-                      #{index + 1}
-                    </span>
+                        <b>
+                          {item.score} pts
+                        </b>
 
-                    <strong>
-                      {answerPlayer
-                        ?.player_name ||
-                        'Jugador'}
-                    </strong>
+                      </div>
 
-                    <b>
-                      +{answer.points}
-                    </b>
+                    )
+                  )}
 
-                  </div>
+              </div>
 
-                )
-              }
-            )}
+            </>
 
-          </div>
-
-
-          {/*
-          =====================================
-          MARCADOR GENERAL
-          =====================================
-          */}
-
-          <div className="live-scoreboard">
-
-            <h3>
-              Marcador
-            </h3>
-
-
-            {[...players]
-              .sort(
-                (a, b) =>
-                  b.score -
-                  a.score
-              )
-              .map(
-                (
-                  item,
-                  index
-                ) => (
-
-                  <div
-                    className="live-score-row"
-                    key={item.id}
-                  >
-
-                    <span>
-                      #{index + 1}
-                    </span>
-
-                    <strong>
-                      {item.player_name}
-                    </strong>
-
-                    <b>
-                      {item.score} pts
-                    </b>
-
-                  </div>
-
-                )
-              )}
-
-          </div>
+          )}
 
         </>
 
