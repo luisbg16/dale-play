@@ -2578,164 +2578,75 @@ export default function OneNoteGamePage() {
   */
 
   if (
-    room.current_round >=
-    room.total_rounds
+  room.current_round >=
+  room.total_rounds
+) {
+  if (
+    finishingRef.current
   ) {
-    if (
-      finishingRef.current
-    ) {
-      return
-    }
-
-
-    finishingRef.current =
-      true
-
-    setMessage('')
-
-
-    try {
-
-      /*
-      1. Cargamos primero el ranking.
-
-      Todavía NO cambiamos la sala
-      a finished.
-      */
-
-      const {
-        data: finalPlayers,
-        error: playersError
-      } =
-        await supabase
-          .from('room_players')
-          .select('*')
-          .eq(
-            'room_id',
-            room.id
-          )
-          .order(
-            'score',
-            {
-              ascending: false
-            }
-          )
-
-
-      if (playersError) {
-        throw playersError
-      }
-
-
-      /*
-      2. Ahora terminamos la sala.
-
-      Usamos .select().single()
-      para recibir inmediatamente
-      la versión final de la sala.
-
-      Así no dependemos de Realtime
-      para actualizar al host.
-      */
-
-      const {
-        data: finalRoom,
-        error: finishError
-      } =
-        await supabase
-          .from('rooms')
-          .update({
-            status:
-              'finished',
-
-            current_song_id:
-              null,
-
-            one_note_turn_started_at:
-              null,
-
-            one_note_active_player_id:
-              null
-          })
-          .eq(
-            'id',
-            room.id
-          )
-          .select('*')
-          .single()
-
-
-      if (
-        finishError ||
-        !finalRoom
-      ) {
-        throw (
-          finishError ||
-          new Error(
-            'No pude cargar los resultados.'
-          )
-        )
-      }
-
-
-      /*
-      3. YA TENEMOS TODO.
-
-      Actualizamos ambos estados
-      prácticamente al mismo tiempo.
-
-      React pasa directamente:
-
-      última canción
-          ↓
-      tabla final
-
-      SIN pantalla intermedia.
-      */
-
-      setPlayers(
-        finalPlayers || []
-      )
-
-
-      setRoom(
-        finalRoom
-      )
-
-
-    } catch (error) {
-      console.error(
-        'Error mostrando resultados:',
-        error
-      )
-
-
-      setMessage(
-        error.message ||
-        'No se pudieron cargar los resultados.'
-      )
-
-
-    } finally {
-
-      /*
-      Esperamos a que React procese
-      el cambio antes de permitir
-      otro cierre.
-      */
-
-      setTimeout(
-        () => {
-          finishingRef.current =
-            false
-        },
-        500
-      )
-    }
-
-
     return
   }
+
+  finishingRef.current =
+    true
+
+  setMessage('')
+
+  try {
+    const {
+      error
+    } =
+      await supabase
+        .from('rooms')
+        .update({
+          status:
+            'finished',
+
+          current_song_id:
+            null,
+
+          one_note_turn_started_at:
+            null,
+
+          one_note_active_player_id:
+            null
+        })
+        .eq(
+          'id',
+          room.id
+        )
+
+
+    if (error) {
+      throw error
+    }
+
+
+    setTimeout(
+      () => {
+        window.location.reload()
+      },
+      150
+    )
+
+
+  } catch (error) {
+    console.error(
+      'Error terminando partida:',
+      error
+    )
+
+    finishingRef.current =
+      false
+
+    setMessage(
+      error.message ||
+      'No se pudieron cargar los resultados.'
+    )
+  }
+
+  return
+}
 
 
   /*
