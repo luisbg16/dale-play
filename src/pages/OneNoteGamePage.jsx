@@ -2537,246 +2537,286 @@ export default function OneNoteGamePage() {
   =====================================
   */
 
+
   async function nextRound() {
-    if (
-      !player?.is_host
-    ) {
-      return
-    }
-
-
-    stopFragment()
-
-
-    setNeedsFirstPlayTap(
-      false
-    )
-
-
-    clearTimeout(
-      firstPlayFallbackTimerRef.current
-    )
-
-
-    if (
-      room.current_round >=
-      room.total_rounds
-    ) {
-      if (
-        finishingRef.current
-      ) {
-        return
-      }
-
-
-      finishingRef.current =
-        true
-
-
-      setLoadingFinalResults(
-        true
-      )
-
-      setMessage('')
-
-
-      try {
-        const {
-          error: finishError
-        } =
-          await supabase
-            .from('rooms')
-            .update({
-              status:
-                'finished',
-
-              current_song_id:
-                null,
-
-              one_note_turn_started_at:
-                null
-            })
-            .eq(
-              'id',
-              room.id
-            )
-
-
-        if (finishError) {
-          throw finishError
-        }
-
-
-        const {
-          data: finalPlayers,
-          error: playersError
-        } =
-          await supabase
-            .from('room_players')
-            .select('*')
-            .eq(
-              'room_id',
-              room.id
-            )
-            .order(
-              'score',
-              {
-                ascending: false
-              }
-            )
-
-
-        if (playersError) {
-          throw playersError
-        }
-
-
-        const {
-          data: finalRoom,
-          error: roomError
-        } =
-          await supabase
-            .from('rooms')
-            .select('*')
-            .eq(
-              'id',
-              room.id
-            )
-            .single()
-
-
-        if (
-          roomError ||
-          !finalRoom
-        ) {
-          throw (
-            roomError ||
-            new Error(
-              'No pude cargar los resultados.'
-            )
-          )
-        }
-
-
-        setPlayers(
-          finalPlayers || []
-        )
-
-
-        setRoom(
-          finalRoom
-        )
-
-
-        setLoadingFinalResults(
-          false
-        )
-
-
-      } catch (error) {
-        console.error(error)
-
-
-        setLoadingFinalResults(
-          false
-        )
-
-
-        setMessage(
-          error.message ||
-          'No se pudieron cargar los resultados.'
-        )
-
-
-      } finally {
-        setTimeout(
-          () => {
-            finishingRef.current =
-              false
-          },
-          500
-        )
-      }
-
-
-      return
-    }
-
-
-    const candidates =
-      songs.filter(
-        item =>
-          item.id !==
-          room.current_song_id
-      )
-
-
-    if (!candidates.length) {
-      setMessage(
-        'No hay canciones disponibles.'
-      )
-
-      return
-    }
-
-
-    const nextSong =
-      candidates[
-        Math.floor(
-          Math.random() *
-          candidates.length
-        )
-      ]
-
-
-    autoPlayKeyRef.current =
-      null
-
-
-    playbackStartedRef.current =
-      false
-
-
-    const {
-      error
-    } =
-      await supabase
-        .from('rooms')
-        .update({
-          current_round:
-            room.current_round + 1,
-
-          current_song_id:
-            nextSong.id,
-
-          one_note_level:
-            0,
-
-          one_note_active_player_id:
-            null,
-
-          one_note_winner_player_id:
-            null,
-
-          one_note_turn_started_at:
-            null,
-
-          one_note_result:
-            null
-        })
-        .eq(
-          'id',
-          room.id
-        )
-
-
-    if (error) {
-      setMessage(
-        error.message
-      )
-    }
+  if (
+    !player?.is_host
+  ) {
+    return
   }
 
+
+  stopFragment()
+
+
+  setNeedsFirstPlayTap(
+    false
+  )
+
+
+  clearTimeout(
+    firstPlayFallbackTimerRef.current
+  )
+
+
+  /*
+  =====================================
+  ÚLTIMA RONDA
+  =====================================
+
+  IMPORTANTE:
+
+  NO activamos loadingFinalResults.
+
+  Mientras hacemos las consultas,
+  el host continúa viendo la tarjeta
+  de la última canción.
+
+  Cuando TODO está listo,
+  pasamos directamente a resultados.
+  =====================================
+  */
+
+  if (
+    room.current_round >=
+    room.total_rounds
+  ) {
+    if (
+      finishingRef.current
+    ) {
+      return
+    }
+
+
+    finishingRef.current =
+      true
+
+    setMessage('')
+
+
+    try {
+
+      /*
+      1. Cargamos primero el ranking.
+
+      Todavía NO cambiamos la sala
+      a finished.
+      */
+
+      const {
+        data: finalPlayers,
+        error: playersError
+      } =
+        await supabase
+          .from('room_players')
+          .select('*')
+          .eq(
+            'room_id',
+            room.id
+          )
+          .order(
+            'score',
+            {
+              ascending: false
+            }
+          )
+
+
+      if (playersError) {
+        throw playersError
+      }
+
+
+      /*
+      2. Ahora terminamos la sala.
+
+      Usamos .select().single()
+      para recibir inmediatamente
+      la versión final de la sala.
+
+      Así no dependemos de Realtime
+      para actualizar al host.
+      */
+
+      const {
+        data: finalRoom,
+        error: finishError
+      } =
+        await supabase
+          .from('rooms')
+          .update({
+            status:
+              'finished',
+
+            current_song_id:
+              null,
+
+            one_note_turn_started_at:
+              null,
+
+            one_note_active_player_id:
+              null
+          })
+          .eq(
+            'id',
+            room.id
+          )
+          .select('*')
+          .single()
+
+
+      if (
+        finishError ||
+        !finalRoom
+      ) {
+        throw (
+          finishError ||
+          new Error(
+            'No pude cargar los resultados.'
+          )
+        )
+      }
+
+
+      /*
+      3. YA TENEMOS TODO.
+
+      Actualizamos ambos estados
+      prácticamente al mismo tiempo.
+
+      React pasa directamente:
+
+      última canción
+          ↓
+      tabla final
+
+      SIN pantalla intermedia.
+      */
+
+      setPlayers(
+        finalPlayers || []
+      )
+
+
+      setRoom(
+        finalRoom
+      )
+
+
+    } catch (error) {
+      console.error(
+        'Error mostrando resultados:',
+        error
+      )
+
+
+      setMessage(
+        error.message ||
+        'No se pudieron cargar los resultados.'
+      )
+
+
+    } finally {
+
+      /*
+      Esperamos a que React procese
+      el cambio antes de permitir
+      otro cierre.
+      */
+
+      setTimeout(
+        () => {
+          finishingRef.current =
+            false
+        },
+        500
+      )
+    }
+
+
+    return
+  }
+
+
+  /*
+  =====================================
+  SIGUIENTE RONDA NORMAL
+  =====================================
+  */
+
+  const candidates =
+    songs.filter(
+      item =>
+        item.id !==
+        room.current_song_id
+    )
+
+
+  if (!candidates.length) {
+    setMessage(
+      'No hay canciones disponibles.'
+    )
+
+    return
+  }
+
+
+  const nextSong =
+    candidates[
+      Math.floor(
+        Math.random() *
+        candidates.length
+      )
+    ]
+
+
+  autoPlayKeyRef.current =
+    null
+
+
+  playbackStartedRef.current =
+    false
+
+
+  const {
+    error
+  } =
+    await supabase
+      .from('rooms')
+      .update({
+        current_round:
+          room.current_round + 1,
+
+        current_song_id:
+          nextSong.id,
+
+        one_note_level:
+          0,
+
+        one_note_active_player_id:
+          null,
+
+        one_note_winner_player_id:
+          null,
+
+        one_note_turn_started_at:
+          null,
+
+        one_note_result:
+          null
+      })
+      .eq(
+        'id',
+        room.id
+      )
+
+
+  if (error) {
+    setMessage(
+      error.message
+    )
+  }
+}
 
   /*
   =====================================
