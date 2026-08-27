@@ -122,6 +122,12 @@ export default function OneNoteGamePage() {
     useNavigate()
 
 
+  /*
+  =====================================
+  DATOS
+  =====================================
+  */
+
   const [room, setRoom] =
     useState(null)
 
@@ -141,6 +147,12 @@ export default function OneNoteGamePage() {
     useState([])
 
 
+  /*
+  =====================================
+  BUSCADOR
+  =====================================
+  */
+
   const [query, setQuery] =
     useState('')
 
@@ -154,6 +166,12 @@ export default function OneNoteGamePage() {
     setSearchResults
   ] = useState([])
 
+
+  /*
+  =====================================
+  SPOTIFY
+  =====================================
+  */
 
   const [
     isPlaying,
@@ -179,6 +197,12 @@ export default function OneNoteGamePage() {
     useRef(null)
 
 
+  /*
+  =====================================
+  COUNTDOWN DE RONDA
+  =====================================
+  */
+
   const [
     countdown,
     setCountdown
@@ -190,15 +214,29 @@ export default function OneNoteGamePage() {
   ] = useState(false)
 
 
+  /*
+  =====================================
+  TIMER PARA RESPONDER
+  =====================================
+  */
+
   const [
     answerCountdown,
     setAnswerCountdown
   ] = useState(0)
 
-
   const serverOffsetRef =
     useRef(0)
 
+  const timeoutRunningRef =
+    useRef(false)
+
+
+  /*
+  =====================================
+  ACCIONES
+  =====================================
+  */
 
   const [
     buzzing,
@@ -215,13 +253,28 @@ export default function OneNoteGamePage() {
     setSkippingSong
   ] = useState(false)
 
-  const timeoutRunningRef =
-    useRef(false)
+
+  /*
+  =====================================
+  RESULTADOS FINALES
+  =====================================
+  */
+
+  const [
+    loadingFinalResults,
+    setLoadingFinalResults
+  ] = useState(false)
 
 
   const [message, setMessage] =
     useState('')
 
+
+  /*
+  =====================================
+  DERIVADOS
+  =====================================
+  */
 
   const listenLevel =
     Number(
@@ -314,12 +367,8 @@ export default function OneNoteGamePage() {
 
 
   /*
-  IMPORTANTE:
-
-  Ya NO bloqueamos Adivinar porque
-  otra persona esté respondiendo.
-
-  Los demás pueden entrar a la cola.
+  Mientras alguien responde,
+  los demás SÍ pueden entrar a la cola.
   */
 
   const canBuzz =
@@ -376,6 +425,7 @@ export default function OneNoteGamePage() {
 
   useEffect(() => {
     loadInitial()
+
     syncServerClock()
 
 
@@ -412,6 +462,12 @@ export default function OneNoteGamePage() {
     code
   ])
 
+
+  /*
+  =====================================
+  RELOJ DEL SERVIDOR
+  =====================================
+  */
 
   async function syncServerClock() {
     const started =
@@ -463,6 +519,12 @@ export default function OneNoteGamePage() {
     )
   }
 
+
+  /*
+  =====================================
+  CARGA INICIAL
+  =====================================
+  */
 
   async function loadInitial() {
     const {
@@ -523,12 +585,69 @@ export default function OneNoteGamePage() {
     }
 
 
-    setRoom(
-      roomData
-    )
-
     setPlayer(
       playerSession
+    )
+
+
+    /*
+    Si entramos o recargamos una partida
+    ya terminada, primero cargamos ranking.
+    */
+
+    if (
+      roomData.status ===
+      'finished'
+    ) {
+      setLoadingFinalResults(
+        true
+      )
+
+
+      const {
+        data: finalPlayers,
+        error: finalPlayersError
+      } =
+        await supabase
+          .from('room_players')
+          .select('*')
+          .eq(
+            'room_id',
+            roomData.id
+          )
+          .order(
+            'score',
+            {
+              ascending: false
+            }
+          )
+
+
+      if (
+        !finalPlayersError
+      ) {
+        setPlayers(
+          finalPlayers || []
+        )
+      }
+
+
+      setRoom(
+        roomData
+      )
+
+      setLoadingFinalResults(
+        false
+      )
+
+      await loadSongs()
+
+      return
+    }
+
+
+    setRoom(
+      roomData
     )
 
 
@@ -556,6 +675,12 @@ export default function OneNoteGamePage() {
   }
 
 
+  /*
+  =====================================
+  REFRESH SALA
+  =====================================
+  */
+
   async function refreshRoom() {
     if (!room?.id) {
       return null
@@ -580,7 +705,9 @@ export default function OneNoteGamePage() {
       !error &&
       data
     ) {
-      setRoom(data)
+      setRoom(
+        data
+      )
 
       return data
     }
@@ -589,6 +716,12 @@ export default function OneNoteGamePage() {
     return null
   }
 
+
+  /*
+  =====================================
+  JUGADORES
+  =====================================
+  */
 
   async function loadPlayers(
     roomId
@@ -615,15 +748,24 @@ export default function OneNoteGamePage() {
     if (error) {
       console.error(error)
 
-      return
+      return []
     }
 
 
     setPlayers(
       data || []
     )
+
+
+    return data || []
   }
 
+
+  /*
+  =====================================
+  CANCIONES
+  =====================================
+  */
 
   async function loadSongs() {
     const {
@@ -644,11 +786,11 @@ export default function OneNoteGamePage() {
     if (error) {
       console.error(error)
 
-      return
+      return []
     }
 
 
-    setSongs(
+    const cleanSongs =
       (data || [])
         .filter(
           item =>
@@ -656,7 +798,14 @@ export default function OneNoteGamePage() {
               item.spotify_id
             )
         )
+
+
+    setSongs(
+      cleanSongs
     )
+
+
+    return cleanSongs
   }
 
 
@@ -689,9 +838,17 @@ export default function OneNoteGamePage() {
     }
 
 
-    setSong(data)
+    setSong(
+      data
+    )
   }
 
+
+  /*
+  =====================================
+  BUZZES
+  =====================================
+  */
 
   async function loadBuzzes(
     roomId,
@@ -740,7 +897,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  COUNTDOWN NUEVA RONDA
+  COUNTDOWN 3...2...1
   =====================================
   */
 
@@ -782,11 +939,13 @@ export default function OneNoteGamePage() {
       setCountdown(
         Math.min(
           Math.ceil(
-            remainingMs / 1000
+            remainingMs /
+            1000
           ),
           3
         )
       )
+
 
       setRoundReady(false)
     }
@@ -855,7 +1014,9 @@ export default function OneNoteGamePage() {
       `spotify:track:${spotifyId}`
 
 
-    setSpotifyReady(false)
+    setSpotifyReady(
+      false
+    )
 
 
     if (
@@ -871,7 +1032,9 @@ export default function OneNoteGamePage() {
 
       setTimeout(
         () => {
-          setSpotifyReady(true)
+          setSpotifyReady(
+            true
+          )
         },
         450
       )
@@ -907,13 +1070,21 @@ export default function OneNoteGamePage() {
         controller.addListener(
           'ready',
           () => {
-            setSpotifyReady(true)
+            setSpotifyReady(
+              true
+            )
           }
         )
       }
     )
   }
 
+
+  /*
+  =====================================
+  REPRODUCCIÓN
+  =====================================
+  */
 
   function playDuration(
     seconds
@@ -938,7 +1109,9 @@ export default function OneNoteGamePage() {
         .restart()
 
 
-      setIsPlaying(true)
+      setIsPlaying(
+        true
+      )
 
 
       stopTimerRef.current =
@@ -947,9 +1120,12 @@ export default function OneNoteGamePage() {
             controllerRef.current
               ?.pause()
 
-            setIsPlaying(false)
+            setIsPlaying(
+              false
+            )
           },
-          seconds * 1000
+          seconds *
+          1000
         )
 
 
@@ -982,17 +1158,15 @@ export default function OneNoteGamePage() {
       ?.pause()
 
 
-    setIsPlaying(false)
+    setIsPlaying(
+      false
+    )
   }
 
 
   /*
-  AL TERMINAR 3...2...1
-
-  Intentamos reproducir automáticamente.
-
-  El botón Play queda visible como respaldo
-  si Safari / Spotify bloquean autoplay.
+  Al terminar el 3...2...1,
+  intentamos reproducir automáticamente.
   */
 
   useEffect(() => {
@@ -1024,7 +1198,8 @@ export default function OneNoteGamePage() {
 
 
     playDuration(
-      LISTEN_LEVELS[0].duration
+      LISTEN_LEVELS[0]
+        .duration
     )
 
   }, [
@@ -1037,8 +1212,8 @@ export default function OneNoteGamePage() {
 
 
   /*
-  En cuanto alguien entra a responder,
-  paramos el audio.
+  Cuando alguien responde,
+  paramos audio.
   */
 
   useEffect(() => {
@@ -1053,6 +1228,11 @@ export default function OneNoteGamePage() {
     player?.is_host
   ])
 
+
+  /*
+  Cuando termina la ronda,
+  paramos audio.
+  */
 
   useEffect(() => {
     if (
@@ -1104,7 +1284,8 @@ export default function OneNoteGamePage() {
 
       const endTime =
         startedAt +
-        seconds * 1000
+        seconds *
+        1000
 
 
       const remaining =
@@ -1123,12 +1304,6 @@ export default function OneNoteGamePage() {
         remaining
       )
 
-
-      /*
-      El HOST es quien dispara el timeout.
-      Así evitamos que 5 celulares ejecuten
-      el RPC al mismo tiempo.
-      */
 
       if (
         remaining <= 0 &&
@@ -1235,6 +1410,7 @@ export default function OneNoteGamePage() {
           `one-note-${roomId}`
         )
 
+
         .on(
           'postgres_changes',
           {
@@ -1263,7 +1439,79 @@ export default function OneNoteGamePage() {
               )
 
 
-            setRoom(updated)
+            /*
+            =====================================
+            IMPORTANTE:
+            RESULTADOS FINALES
+
+            Primero cargamos players.
+            DESPUÉS cambiamos room a finished.
+
+            Esto evita pantalla negra.
+            =====================================
+            */
+
+            if (
+              updated.status ===
+              'finished'
+            ) {
+              stopFragment()
+
+
+              setLoadingFinalResults(
+                true
+              )
+
+
+              const {
+                data: finalPlayers,
+                error: finalPlayersError
+              } =
+                await supabase
+                  .from('room_players')
+                  .select('*')
+                  .eq(
+                    'room_id',
+                    updated.id
+                  )
+                  .order(
+                    'score',
+                    {
+                      ascending: false
+                    }
+                  )
+
+
+              if (
+                !finalPlayersError
+              ) {
+                setPlayers(
+                  finalPlayers || []
+                )
+              }
+
+
+              setRoom(
+                updated
+              )
+
+
+              setLoadingFinalResults(
+                false
+              )
+
+
+              return
+            }
+
+
+            /*
+            Partida normal.
+            */
+
+            setRoom(
+              updated
+            )
 
 
             if (
@@ -1276,9 +1524,12 @@ export default function OneNoteGamePage() {
             }
 
 
-            if (roundChanged) {
+            if (
+              roundChanged
+            ) {
               autoPlayKeyRef.current =
                 null
+
 
               setQuery('')
               setSelectedGuess(null)
@@ -1308,18 +1559,9 @@ export default function OneNoteGamePage() {
                 )
               ])
             }
-
-
-            if (
-              updated.status ===
-              'finished'
-            ) {
-              await loadPlayers(
-                updated.id
-              )
-            }
           }
         )
+
 
         .on(
           'postgres_changes',
@@ -1342,6 +1584,7 @@ export default function OneNoteGamePage() {
           }
         )
 
+
         .on(
           'postgres_changes',
           {
@@ -1357,6 +1600,7 @@ export default function OneNoteGamePage() {
             )
           }
         )
+
 
         .subscribe()
 
@@ -1382,7 +1626,8 @@ export default function OneNoteGamePage() {
   useEffect(() => {
     if (
       !room?.id ||
-      !room?.current_round
+      !room?.current_round ||
+      room?.status === 'finished'
     ) {
       return
     }
@@ -1409,6 +1654,57 @@ export default function OneNoteGamePage() {
             !error &&
             freshRoom
           ) {
+            /*
+            Si detectamos finished por polling,
+            hacemos exactamente lo mismo que Realtime.
+            */
+
+            if (
+              freshRoom.status ===
+              'finished'
+            ) {
+              setLoadingFinalResults(
+                true
+              )
+
+
+              const {
+                data: finalPlayers
+              } =
+                await supabase
+                  .from('room_players')
+                  .select('*')
+                  .eq(
+                    'room_id',
+                    freshRoom.id
+                  )
+                  .order(
+                    'score',
+                    {
+                      ascending: false
+                    }
+                  )
+
+
+              setPlayers(
+                finalPlayers || []
+              )
+
+
+              setRoom(
+                freshRoom
+              )
+
+
+              setLoadingFinalResults(
+                false
+              )
+
+
+              return
+            }
+
+
             const oldSong =
               room.current_song_id
 
@@ -1453,13 +1749,14 @@ export default function OneNoteGamePage() {
   }, [
     room?.id,
     room?.current_round,
-    room?.current_song_id
+    room?.current_song_id,
+    room?.status
   ])
 
 
   /*
   =====================================
-  BUZZ
+  ADIVINAR
   =====================================
   */
 
@@ -1472,7 +1769,10 @@ export default function OneNoteGamePage() {
     }
 
 
-    setBuzzing(true)
+    setBuzzing(
+      true
+    )
+
     setMessage('')
 
 
@@ -1528,13 +1828,16 @@ export default function OneNoteGamePage() {
     } catch (error) {
       console.error(error)
 
+
       setMessage(
         error.message ||
         'No se pudo registrar tu intento.'
       )
 
     } finally {
-      setBuzzing(false)
+      setBuzzing(
+        false
+      )
     }
   }
 
@@ -1602,7 +1905,10 @@ export default function OneNoteGamePage() {
     }
 
 
-    setSubmitting(true)
+    setSubmitting(
+      true
+    )
+
     setMessage('')
 
 
@@ -1653,13 +1959,16 @@ export default function OneNoteGamePage() {
     } catch (error) {
       console.error(error)
 
+
       setMessage(
         error.message ||
         'No se pudo enviar la respuesta.'
       )
 
     } finally {
-      setSubmitting(false)
+      setSubmitting(
+        false
+      )
     }
   }
 
@@ -1681,6 +1990,7 @@ export default function OneNoteGamePage() {
 
 
     stopFragment()
+
     setMessage('')
 
 
@@ -1725,12 +2035,7 @@ export default function OneNoteGamePage() {
 
 
     /*
-    Como esto ocurre directamente
-    después de tocar Escuchar más,
-    es una interacción del usuario.
-
-    Por eso Spotify debería dejar
-    reproducirlo incluso en móvil.
+    Escuchar más reproduce inmediatamente.
     */
 
     if (
@@ -1765,7 +2070,11 @@ export default function OneNoteGamePage() {
 
     stopFragment()
 
-    setSkippingSong(true)
+
+    setSkippingSong(
+      true
+    )
+
     setMessage('')
 
 
@@ -1804,13 +2113,16 @@ export default function OneNoteGamePage() {
     } catch (error) {
       console.error(error)
 
+
       setMessage(
         error.message ||
         'No se pudo saltar la canción.'
       )
 
     } finally {
-      setSkippingSong(false)
+      setSkippingSong(
+        false
+      )
     }
   }
 
@@ -1832,31 +2144,128 @@ export default function OneNoteGamePage() {
     stopFragment()
 
 
+    /*
+    =====================================
+    ÚLTIMA RONDA
+    =====================================
+    */
+
     if (
       room.current_round >=
       room.total_rounds
     ) {
-      await supabase
-        .from('rooms')
-        .update({
-          status:
-            'finished',
+      setLoadingFinalResults(
+        true
+      )
 
-          current_song_id:
-            null,
 
-          one_note_turn_started_at:
-            null
-        })
-        .eq(
-          'id',
-          room.id
+      const {
+        error
+      } =
+        await supabase
+          .from('rooms')
+          .update({
+            status:
+              'finished',
+
+            current_song_id:
+              null,
+
+            one_note_turn_started_at:
+              null
+          })
+          .eq(
+            'id',
+            room.id
+          )
+
+
+      if (error) {
+        setLoadingFinalResults(
+          false
         )
+
+
+        setMessage(
+          error.message
+        )
+
+        return
+      }
+
+
+      /*
+      Además de esperar Realtime,
+      el propio host carga el ranking
+      inmediatamente.
+      */
+
+      const {
+        data: finalPlayers,
+        error: finalPlayersError
+      } =
+        await supabase
+          .from('room_players')
+          .select('*')
+          .eq(
+            'room_id',
+            room.id
+          )
+          .order(
+            'score',
+            {
+              ascending: false
+            }
+          )
+
+
+      if (
+        !finalPlayersError
+      ) {
+        setPlayers(
+          finalPlayers || []
+        )
+      }
+
+
+      const {
+        data: finalRoom,
+        error: finalRoomError
+      } =
+        await supabase
+          .from('rooms')
+          .select('*')
+          .eq(
+            'id',
+            room.id
+          )
+          .single()
+
+
+      if (
+        !finalRoomError &&
+        finalRoom
+      ) {
+        setRoom(
+          finalRoom
+        )
+      }
+
+
+      setLoadingFinalResults(
+        false
+      )
 
 
       return
     }
 
+
+    /*
+    =====================================
+    SIGUIENTE CANCIÓN
+    =====================================
+    */
 
     const candidates =
       songs.filter(
@@ -1931,12 +2340,228 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  FINAL
+  JUGAR DE NUEVO
+  =====================================
+  */
+
+  async function playAgain() {
+    if (
+      !player?.is_host ||
+      loadingFinalResults
+    ) {
+      return
+    }
+
+
+    let availableSongs =
+      songs.filter(
+        item =>
+          Boolean(
+            item.spotify_id
+          )
+      )
+
+
+    /*
+    Si venimos de recargar la pantalla
+    final y songs todavía no está cargado,
+    lo cargamos aquí.
+    */
+
+    if (
+      !availableSongs.length
+    ) {
+      availableSongs =
+        await loadSongs()
+    }
+
+
+    if (
+      !availableSongs.length
+    ) {
+      setMessage(
+        'No hay canciones disponibles.'
+      )
+
+      return
+    }
+
+
+    const firstSong =
+      availableSongs[
+        Math.floor(
+          Math.random() *
+          availableSongs.length
+        )
+      ]
+
+
+    setLoadingFinalResults(
+      true
+    )
+
+    setMessage('')
+
+
+    const {
+      error
+    } =
+      await supabase
+        .rpc(
+          'restart_one_note_game',
+          {
+            p_room_id:
+              room.id,
+
+            p_host_player_id:
+              player.player_id,
+
+            p_song_id:
+              firstSong.id
+          }
+        )
+
+
+    if (error) {
+      setLoadingFinalResults(
+        false
+      )
+
+
+      setMessage(
+        error.message
+      )
+
+      return
+    }
+
+
+    autoPlayKeyRef.current =
+      null
+
+
+    setBuzzes([])
+    setQuery('')
+    setSelectedGuess(null)
+    setSearchResults([])
+    setAnswerCountdown(0)
+
+
+    /*
+    Cargamos TODO antes de salir
+    de resultados.
+    */
+
+    const {
+      data: restartedRoom,
+      error: restartedRoomError
+    } =
+      await supabase
+        .from('rooms')
+        .select('*')
+        .eq(
+          'id',
+          room.id
+        )
+        .single()
+
+
+    await Promise.all([
+      loadPlayers(
+        room.id
+      ),
+
+      loadSong(
+        firstSong.id
+      )
+    ])
+
+
+    if (
+      !restartedRoomError &&
+      restartedRoom
+    ) {
+      setRoom(
+        restartedRoom
+      )
+
+
+      await loadBuzzes(
+        restartedRoom.id,
+        restartedRoom.current_round
+      )
+    }
+
+
+    setLoadingFinalResults(
+      false
+    )
+  }
+
+
+  /*
+  =====================================
+  LOADING INICIAL
   =====================================
   */
 
   if (
-    room?.status ===
+    !room ||
+    !player
+  ) {
+    return (
+      <section className="one-note-game">
+
+        <div className="solo-loading">
+          Cargando...
+        </div>
+
+      </section>
+    )
+  }
+
+
+  /*
+  =====================================
+  PREPARANDO RESULTADOS
+  =====================================
+  */
+
+  if (
+    loadingFinalResults
+  ) {
+    return (
+      <section className="one-note-game">
+
+        <div className="one-note-result">
+
+          <span>
+            EN UNA NOTA
+          </span>
+
+          <h1>
+            Preparando resultados...
+          </h1>
+
+          <p className="muted">
+            Un momento...
+          </p>
+
+        </div>
+
+      </section>
+    )
+  }
+
+
+  /*
+  =====================================
+  RESULTADO FINAL
+  =====================================
+  */
+
+  if (
+    room.status ===
     'finished'
   ) {
     const ranking =
@@ -1946,6 +2571,34 @@ export default function OneNoteGamePage() {
             b.score -
             a.score
         )
+
+
+    /*
+    Protección adicional.
+    Nunca mostramos pantalla negra.
+    */
+
+    if (
+      !ranking.length
+    ) {
+      return (
+        <section className="one-note-game">
+
+          <div className="one-note-result">
+
+            <span>
+              EN UNA NOTA
+            </span>
+
+            <h1>
+              Preparando resultados...
+            </h1>
+
+          </div>
+
+        </section>
+      )
+    }
 
 
     return (
@@ -1995,6 +2648,20 @@ export default function OneNoteGamePage() {
           </div>
 
 
+          {player.is_host && (
+
+            <button
+              className="primary"
+              onClick={
+                playAgain
+              }
+            >
+              Jugar de nuevo
+            </button>
+
+          )}
+
+
           <button
             className="secondary"
             onClick={
@@ -2007,6 +2674,15 @@ export default function OneNoteGamePage() {
             Salir
           </button>
 
+
+          {message && (
+
+            <div className="message">
+              {message}
+            </div>
+
+          )}
+
         </div>
 
       </section>
@@ -2014,21 +2690,11 @@ export default function OneNoteGamePage() {
   }
 
 
-  if (
-    !room ||
-    !player
-  ) {
-    return (
-      <section className="one-note-game">
-
-        <div className="solo-loading">
-          Cargando...
-        </div>
-
-      </section>
-    )
-  }
-
+  /*
+  =====================================
+  JUEGO
+  =====================================
+  */
 
   return (
     <section className="one-note-game">
@@ -2068,6 +2734,12 @@ export default function OneNoteGamePage() {
 
       </div>
 
+
+      {/*
+      =====================================
+      RESULTADO DE RONDA
+      =====================================
+      */}
 
       {roundFinished ? (
 
@@ -2131,7 +2803,10 @@ export default function OneNoteGamePage() {
               }
             >
 
-              <ArrowRight size={18} />
+              <ArrowRight
+                size={18}
+              />
+
 
               {room.current_round >=
               room.total_rounds
@@ -2153,11 +2828,18 @@ export default function OneNoteGamePage() {
 
       ) : !roundReady ? (
 
+        /*
+        =====================================
+        3...2...1
+        =====================================
+        */
+
         <div className="one-note-countdown">
 
           <span>
             PREPÁRENSE
           </span>
+
 
           <strong>
             {countdown || 1}
@@ -2170,6 +2852,12 @@ export default function OneNoteGamePage() {
 
         <>
 
+
+          {/*
+          =====================================
+          NIVELES
+          =====================================
+          */}
 
           <div className="one-note-progress">
 
@@ -2203,6 +2891,12 @@ export default function OneNoteGamePage() {
 
           </div>
 
+
+          {/*
+          =====================================
+          HOST
+          =====================================
+          */}
 
           {player.is_host && (
 
@@ -2295,6 +2989,12 @@ export default function OneNoteGamePage() {
           )}
 
 
+          {/*
+          =====================================
+          ADIVINAR / ESTADOS
+          =====================================
+          */}
+
           {!isMyTurn && (
 
             <div className="one-note-player-action">
@@ -2373,6 +3073,12 @@ export default function OneNoteGamePage() {
           )}
 
 
+          {/*
+          =====================================
+          RESPONDER
+          =====================================
+          */}
+
           {isMyTurn && (
 
             <div className="one-note-answer">
@@ -2382,6 +3088,7 @@ export default function OneNoteGamePage() {
                 <strong>
                   Tu turno
                 </strong>
+
 
                 <b>
                   {answerCountdown}
@@ -2394,7 +3101,9 @@ export default function OneNoteGamePage() {
 
                 <div className="one-note-search">
 
-                  <Search size={19} />
+                  <Search
+                    size={19}
+                  />
 
 
                   <input
@@ -2481,6 +3190,12 @@ export default function OneNoteGamePage() {
 
           )}
 
+
+          {/*
+          =====================================
+          ORDEN
+          =====================================
+          */}
 
           <div className="one-note-queue">
 
@@ -2570,6 +3285,12 @@ export default function OneNoteGamePage() {
 
       )}
 
+
+      {/*
+      =====================================
+      FLOTANTE GLOBAL
+      =====================================
+      */}
 
       {activePlayer &&
         !roundFinished &&
