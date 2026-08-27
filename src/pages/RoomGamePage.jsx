@@ -415,6 +415,12 @@ export default function RoomGamePage() {
   const spotifyLoadTimerRef =
     useRef(null)
 
+  const countdownAudioContextRef =
+    useRef(null)
+
+  const lastCountdownSoundRef =
+    useRef(null)
+
 
   const [
     spotifyReady,
@@ -578,6 +584,140 @@ export default function RoomGamePage() {
       Date.now() +
       serverOffsetRef.current
     )
+  }
+
+
+  /*
+  =====================================
+  SONIDO DEL CONTEO
+  =====================================
+  */
+
+  function getCountdownAudioContext() {
+    if (
+      typeof window === 'undefined'
+    ) {
+      return null
+    }
+
+
+    const AudioContextClass =
+      window.AudioContext ||
+      window.webkitAudioContext
+
+
+    if (!AudioContextClass) {
+      return null
+    }
+
+
+    if (
+      !countdownAudioContextRef.current
+    ) {
+      countdownAudioContextRef.current =
+        new AudioContextClass()
+    }
+
+
+    return (
+      countdownAudioContextRef.current
+    )
+  }
+
+
+  function playCountdownTick(value) {
+    if (
+      !value ||
+      value < 1 ||
+      value > PREPARE_SECONDS
+    ) {
+      return
+    }
+
+
+    if (
+      lastCountdownSoundRef.current ===
+      value
+    ) {
+      return
+    }
+
+
+    lastCountdownSoundRef.current =
+      value
+
+
+    try {
+      const context =
+        getCountdownAudioContext()
+
+
+      if (!context) {
+        return
+      }
+
+
+      if (
+        context.state === 'suspended'
+      ) {
+        context.resume().catch(() => {})
+      }
+
+
+      const oscillator =
+        context.createOscillator()
+
+      const gain =
+        context.createGain()
+
+
+      oscillator.type =
+        'sine'
+
+
+      oscillator.frequency.value =
+        value === 1
+          ? 720
+          : 560
+
+
+      const now =
+        context.currentTime
+
+
+      gain.gain.setValueAtTime(
+        0.0001,
+        now
+      )
+
+      gain.gain.exponentialRampToValueAtTime(
+        0.055,
+        now + 0.01
+      )
+
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        now + 0.11
+      )
+
+
+      oscillator.connect(gain)
+      gain.connect(
+        context.destination
+      )
+
+
+      oscillator.start(now)
+      oscillator.stop(
+        now + 0.12
+      )
+
+    } catch (error) {
+      console.warn(
+        'No se pudo reproducir el conteo:',
+        error
+      )
+    }
   }
 
 
@@ -1489,8 +1629,20 @@ export default function RoomGamePage() {
               stopSpotify()
 
 
-              await loadPlayers(
-                roomId
+              /*
+              Recarga controlada para TODOS.
+
+              Al volver a montar la página,
+              loadInitial() encuentra la sala
+              ya terminada y renderiza la tabla
+              final desde un estado limpio.
+              */
+
+              setTimeout(
+                () => {
+                  window.location.reload()
+                },
+                120
               )
 
 
@@ -1624,6 +1776,40 @@ export default function RoomGamePage() {
     room?.current_song_id,
     room?.status,
     player?.player_id
+  ])
+
+
+  /*
+  =====================================
+  SONIDO SINCRONIZADO DEL CONTEO
+  =====================================
+  */
+
+  useEffect(() => {
+    if (
+      room?.status !== 'playing' ||
+      preparationLeft <= 0 ||
+      roundDone
+    ) {
+      if (
+        preparationLeft <= 0
+      ) {
+        lastCountdownSoundRef.current =
+          null
+      }
+
+      return
+    }
+
+
+    playCountdownTick(
+      preparationLeft
+    )
+  }, [
+    preparationLeft,
+    room?.status,
+    room?.current_round,
+    roundDone
   ])
 
 
@@ -2230,6 +2416,10 @@ export default function RoomGamePage() {
       false
 
 
+    lastCountdownSoundRef.current =
+      null
+
+
     setLevelIndex(
       0
     )
@@ -2330,7 +2520,24 @@ export default function RoomGamePage() {
         setMessage(
           error.message
         )
+
+        return
       }
+
+
+      /*
+      Respaldo para el host por si Realtime
+      tarda o el navegador pierde el evento.
+      Los invitados se recargan desde el
+      listener de Realtime de arriba.
+      */
+
+      setTimeout(
+        () => {
+          window.location.reload()
+        },
+        220
+      )
 
 
       return

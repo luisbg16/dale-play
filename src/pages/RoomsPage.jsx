@@ -114,7 +114,13 @@ export default function RoomsPage() {
 
 
   function chooseMode(mode) {
-    setGameMode(mode)
+    setGameMode(
+      current =>
+        current === mode
+          ? null
+          : mode
+    )
+
     setMessage('')
   }
 
