@@ -6027,25 +6027,32 @@ strong {
    RESPONDER - PANEL ENFOCADO
    ===================================== */
 
+/* =====================================
+   RESPONDER - MODAL CENTRADO
+   ===================================== */
+
 .one-note-answer {
   position: fixed;
 
   left: 50%;
-  bottom: 18px;
+  top: 50%;
 
   transform:
-    translateX(-50%);
+    translate(
+      -50%,
+      -50%
+    );
 
   width:
     min(
-      540px,
-      calc(100% - 24px)
+      560px,
+      calc(100% - 32px)
     );
 
   max-height:
-    calc(100vh - 110px);
+    calc(100vh - 80px);
 
-  overflow-y: auto;
+  overflow: visible;
 
   margin: 0;
 
@@ -6068,7 +6075,7 @@ strong {
 }
 
 
-/* fondo oscuro real detrás */
+/* fondo oscuro detrás */
 
 .one-note-game:has(.one-note-answer)::before {
   content: '';
@@ -6089,57 +6096,182 @@ strong {
 }
 
 
-/* el panel queda encima del overlay */
+/* =====================================
+   CABECERA
+   ===================================== */
 
-.one-note-game:has(.one-note-answer)
-.one-note-answer {
-  position: fixed;
-  z-index: 210;
+.one-note-answer-heading {
+  display: flex;
+
+  align-items: center;
+
+  justify-content:
+    space-between;
+
+  margin-bottom:
+    16px;
 }
 
 
-/* ocultamos visualmente el resto */
-
-.one-note-game:has(.one-note-answer)
-.one-note-progress,
-
-.one-note-game:has(.one-note-answer)
-.one-note-host,
-
-.one-note-game:has(.one-note-answer)
-.one-note-player-action,
-
-.one-note-game:has(.one-note-answer)
-.one-note-queue {
-  opacity: 0;
+.one-note-answer-heading strong {
+  font-size:
+    1.05rem;
 }
 
 
-/* buscador sólido */
+.one-note-answer-heading b {
+  font-size:
+    1.35rem;
+}
+
+
+/* =====================================
+   BUSCADOR
+   ===================================== */
+
+.autocomplete {
+  position: relative;
+
+  width: 100%;
+
+  margin-bottom:
+    16px;
+}
+
 
 .one-note-search {
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  width: 100%;
+
+  min-height: 52px;
+
+  padding:
+    0 14px;
+
   background:
     #1c1c1f;
 
   border:
     1px solid
-    rgba(255,255,255,.1);
+    rgba(255,255,255,.10);
+
+  border-radius:
+    14px;
 }
 
 
-/* resultados sólidos */
+.one-note-search input {
+  width: 100%;
+
+  min-width: 0;
+
+  border: 0;
+
+  outline: 0;
+
+  background:
+    transparent;
+
+  color:
+    inherit;
+
+  font-size:
+    1rem;
+}
+
+
+/* =====================================
+   RESULTADOS
+   ===================================== */
 
 .spotify-game-results {
+  position: absolute;
+
+  left: 0;
+  right: 0;
+
+  top:
+    calc(100% + 8px);
+
+  z-index: 260;
+
+  max-height:
+    min(
+      420px,
+      50vh
+    );
+
+  overflow-y: auto;
+
+  overscroll-behavior:
+    contain;
+
   background:
     #18181b !important;
 
   border:
     1px solid
-    rgba(255,255,255,.08);
+    rgba(255,255,255,.09);
+
+  border-radius:
+    16px;
 
   box-shadow:
     0 18px 44px
-    rgba(0,0,0,.5);
+    rgba(0,0,0,.55);
+}
+
+
+.spotify-game-results button {
+  width: 100%;
+
+  min-height: 58px;
+
+  padding:
+    11px 14px;
+
+  text-align: left;
+}
+
+
+.guess-track-info {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap: 3px;
+}
+
+
+.guess-track-info b {
+  line-height: 1.25;
+}
+
+
+.guess-track-info small {
+  opacity: .62;
+}
+
+
+/* scrollbar más discreto */
+
+.spotify-game-results::-webkit-scrollbar {
+  width: 7px;
+}
+
+
+.spotify-game-results::-webkit-scrollbar-thumb {
+  background:
+    rgba(255,255,255,.18);
+
+  border-radius:
+    999px;
 }
 
 
@@ -6147,29 +6279,31 @@ strong {
    MOBILE
    ===================================== */
 
-@media (max-width: 700px) {
+@media (
+  max-width: 700px
+) {
 
   .one-note-answer {
-    left: 50%;
-    top: 50%;
-    bottom: auto;
-
-    transform:
-      translate(
-        -50%,
-        -50%
-      );
-
     width:
-      calc(100% - 24px);
+      calc(100% - 20px);
 
     max-height:
-      calc(100vh - 120px);
+      calc(100dvh - 32px);
 
     padding:
-      20px 18px;
+      18px;
 
-    border-radius: 22px;
+    border-radius:
+      20px;
+  }
+
+
+  .spotify-game-results {
+    max-height:
+      min(
+        360px,
+        45dvh
+      );
   }
 
 }
