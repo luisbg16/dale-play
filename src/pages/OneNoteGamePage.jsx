@@ -114,6 +114,23 @@ function searchLibrary(
 }
 
 
+function isMobileLikeDevice() {
+  if (
+    typeof window === 'undefined'
+  ) {
+    return false
+  }
+
+
+  return (
+    window.matchMedia?.(
+      '(pointer: coarse)'
+    )?.matches ||
+    navigator.maxTouchPoints > 0
+  )
+}
+
+
 export default function OneNoteGamePage() {
   const { code } =
     useParams()
@@ -183,6 +200,11 @@ export default function OneNoteGamePage() {
     setSpotifyReady
   ] = useState(false)
 
+  const [
+    needsFirstPlayTap,
+    setNeedsFirstPlayTap
+  ] = useState(false)
+
 
   const iframeApiRef =
     useRef(null)
@@ -197,6 +219,12 @@ export default function OneNoteGamePage() {
     useRef(null)
 
   const spotifyPreparingRef =
+    useRef(false)
+
+  const firstPlayFallbackTimerRef =
+    useRef(null)
+
+  const playbackStartedRef =
     useRef(false)
 
 
@@ -456,6 +484,11 @@ export default function OneNoteGamePage() {
         stopTimerRef.current
       )
 
+      clearTimeout(
+        firstPlayFallbackTimerRef.current
+      )
+
+
       try {
         controllerRef.current
           ?.destroy?.()
@@ -594,11 +627,6 @@ export default function OneNoteGamePage() {
       playerSession
     )
 
-
-    /*
-    Si entramos a partida ya terminada,
-    cargamos primero jugadores.
-    */
 
     if (
       roomData.status ===
@@ -1158,6 +1186,61 @@ export default function OneNoteGamePage() {
               )
             }
           )
+
+
+          /*
+          Este evento nos permite saber
+          si Spotify realmente comenzó
+          a sonar.
+
+          Es importante para móvil:
+          no confiamos solamente en que
+          llamamos play().
+          */
+
+          controller.addListener(
+            'playback_update',
+            event => {
+              const data =
+                event?.data
+
+
+              if (!data) {
+                return
+              }
+
+
+              const actuallyPlaying =
+                data.isPaused === false
+
+
+              if (
+                actuallyPlaying
+              ) {
+                playbackStartedRef.current =
+                  true
+
+
+                setIsPlaying(
+                  true
+                )
+
+
+                setNeedsFirstPlayTap(
+                  false
+                )
+
+
+                clearTimeout(
+                  firstPlayFallbackTimerRef.current
+                )
+              } else {
+                setIsPlaying(
+                  false
+                )
+              }
+            }
+          )
         }
       )
 
@@ -1181,8 +1264,14 @@ export default function OneNoteGamePage() {
   */
 
   function playDuration(
-    seconds
+    seconds,
+    options = {}
   ) {
+    const {
+      firstPlay = false
+    } = options
+
+
     if (
       !player?.is_host ||
       !controllerRef.current ||
@@ -1199,8 +1288,21 @@ export default function OneNoteGamePage() {
 
 
     try {
-      controllerRef.current
-        .restart()
+      /*
+      El PRIMER fragmento usa play().
+
+      Repeticiones y Escuchar más
+      usan restart(), porque ya sabemos
+      que ese flujo funciona bien.
+      */
+
+      if (firstPlay) {
+        controllerRef.current
+          .play()
+      } else {
+        controllerRef.current
+          .restart()
+      }
 
 
       setIsPlaying(
@@ -1228,7 +1330,11 @@ export default function OneNoteGamePage() {
     } catch (error) {
       console.error(error)
 
-      setIsPlaying(false)
+
+      setIsPlaying(
+        false
+      )
+
 
       return false
     }
@@ -1236,6 +1342,23 @@ export default function OneNoteGamePage() {
 
 
   function playFragment() {
+    /*
+    Si estamos en el primer nivel
+    y el autoplay móvil fue bloqueado,
+    este toque debe funcionar como
+    gesto manual válido.
+    */
+
+    if (
+      listenLevel === 0 &&
+      needsFirstPlayTap
+    ) {
+      manualFirstPlay()
+
+      return
+    }
+
+
     playDuration(
       currentListen.duration
     )
@@ -1259,7 +1382,9 @@ export default function OneNoteGamePage() {
 
 
   /*
-  Autoplay al terminar 3...2...1
+  =====================================
+  PRIMER PLAY AUTOMÁTICO
+  =====================================
   */
 
   useEffect(() => {
@@ -1290,10 +1415,74 @@ export default function OneNoteGamePage() {
       key
 
 
-    playDuration(
-      LISTEN_LEVELS[0]
-        .duration
+    clearTimeout(
+      firstPlayFallbackTimerRef.current
     )
+
+
+    playbackStartedRef.current =
+      false
+
+
+    setNeedsFirstPlayTap(
+      false
+    )
+
+
+    /*
+    Intentamos autoplay.
+    */
+
+    const attempted =
+      playDuration(
+        LISTEN_LEVELS[0]
+          .duration,
+        {
+          firstPlay: true
+        }
+      )
+
+
+    /*
+    En desktop no queremos meter ruido.
+    El fallback está pensado principalmente
+    para móvil/tablet.
+    */
+
+    if (
+      attempted &&
+      isMobileLikeDevice()
+    ) {
+      firstPlayFallbackTimerRef.current =
+        setTimeout(
+          () => {
+            /*
+            Si Spotify nunca confirmó
+            que estaba reproduciendo,
+            asumimos bloqueo de autoplay.
+            */
+
+            if (
+              !playbackStartedRef.current
+            ) {
+              clearTimeout(
+                stopTimerRef.current
+              )
+
+
+              setIsPlaying(
+                false
+              )
+
+
+              setNeedsFirstPlayTap(
+                true
+              )
+            }
+          },
+          900
+        )
+    }
 
   }, [
     player?.is_host,
@@ -1302,6 +1491,88 @@ export default function OneNoteGamePage() {
     room?.current_round,
     roundFinished
   ])
+
+
+  /*
+  =====================================
+  FALLBACK MÓVIL
+  =====================================
+  */
+
+  function manualFirstPlay() {
+    if (
+      !player?.is_host ||
+      !controllerRef.current ||
+      !spotifyReady ||
+      roundFinished
+    ) {
+      return
+    }
+
+
+    clearTimeout(
+      firstPlayFallbackTimerRef.current
+    )
+
+
+    playbackStartedRef.current =
+      false
+
+
+    setNeedsFirstPlayTap(
+      false
+    )
+
+
+    /*
+    Este sí ocurre directamente
+    dentro del toque del usuario.
+    */
+
+    try {
+      controllerRef.current
+        .play()
+
+
+      setIsPlaying(
+        true
+      )
+
+
+      clearTimeout(
+        stopTimerRef.current
+      )
+
+
+      stopTimerRef.current =
+        setTimeout(
+          () => {
+            controllerRef.current
+              ?.pause()
+
+
+            setIsPlaying(
+              false
+            )
+          },
+          LISTEN_LEVELS[0]
+            .duration * 1000
+        )
+
+    } catch (error) {
+      console.error(error)
+
+
+      setIsPlaying(
+        false
+      )
+
+
+      setNeedsFirstPlayTap(
+        true
+      )
+    }
+  }
 
 
   /*
@@ -1333,6 +1604,11 @@ export default function OneNoteGamePage() {
       roundFinished
     ) {
       stopFragment()
+
+
+      setNeedsFirstPlayTap(
+        false
+      )
     }
   }, [
     roundFinished,
@@ -1532,21 +1808,6 @@ export default function OneNoteGamePage() {
               )
 
 
-            /*
-            =====================================
-            FINISHED
-
-            Si el HOST está terminando la partida
-            manualmente, NO tocamos nada aquí.
-
-            nextRound() ya se encargará de cargar
-            ranking + room en el orden correcto.
-
-            Esto elimina la carrera que dejaba
-            pantalla negra.
-            =====================================
-            */
-
             if (
               updated.status ===
               'finished'
@@ -1629,6 +1890,20 @@ export default function OneNoteGamePage() {
             ) {
               autoPlayKeyRef.current =
                 null
+
+
+              playbackStartedRef.current =
+                false
+
+
+              setNeedsFirstPlayTap(
+                false
+              )
+
+
+              clearTimeout(
+                firstPlayFallbackTimerRef.current
+              )
 
 
               setQuery('')
@@ -1737,12 +2012,6 @@ export default function OneNoteGamePage() {
     const syncInterval =
       setInterval(
         async () => {
-          /*
-          Mientras el host está ejecutando
-          el cierre final, polling tampoco
-          interviene.
-          */
-
           if (
             player?.is_host &&
             finishingRef.current
@@ -2113,6 +2382,16 @@ export default function OneNoteGamePage() {
     setMessage('')
 
 
+    setNeedsFirstPlayTap(
+      false
+    )
+
+
+    clearTimeout(
+      firstPlayFallbackTimerRef.current
+    )
+
+
     const {
       data,
       error
@@ -2193,6 +2472,16 @@ export default function OneNoteGamePage() {
     setMessage('')
 
 
+    setNeedsFirstPlayTap(
+      false
+    )
+
+
+    clearTimeout(
+      firstPlayFallbackTimerRef.current
+    )
+
+
     try {
       const {
         error
@@ -2259,19 +2548,15 @@ export default function OneNoteGamePage() {
     stopFragment()
 
 
-    /*
-    =====================================
-    ÚLTIMA RONDA
+    setNeedsFirstPlayTap(
+      false
+    )
 
-    ESTE ES EL ARREGLO PRINCIPAL.
 
-    El host controla completamente
-    la transición a resultados.
+    clearTimeout(
+      firstPlayFallbackTimerRef.current
+    )
 
-    Realtime y polling se ignoran
-    temporalmente mediante finishingRef.
-    =====================================
-    */
 
     if (
       room.current_round >=
@@ -2296,10 +2581,6 @@ export default function OneNoteGamePage() {
 
 
       try {
-        /*
-        Primero cambiamos DB a finished.
-        */
-
         const {
           error: finishError
         } =
@@ -2326,10 +2607,6 @@ export default function OneNoteGamePage() {
         }
 
 
-        /*
-        Después cargamos ranking.
-        */
-
         const {
           data: finalPlayers,
           error: playersError
@@ -2353,11 +2630,6 @@ export default function OneNoteGamePage() {
           throw playersError
         }
 
-
-        /*
-        Finalmente cargamos la sala ya
-        terminada.
-        */
 
         const {
           data: finalRoom,
@@ -2385,14 +2657,6 @@ export default function OneNoteGamePage() {
           )
         }
 
-
-        /*
-        El orden importa:
-
-        1. players
-        2. room finished
-        3. quitar loading
-        */
 
         setPlayers(
           finalPlayers || []
@@ -2425,12 +2689,6 @@ export default function OneNoteGamePage() {
 
 
       } finally {
-        /*
-        Damos un instante después de que
-        React ya renderizó resultados antes
-        de volver a permitir Realtime.
-        */
-
         setTimeout(
           () => {
             finishingRef.current =
@@ -2444,12 +2702,6 @@ export default function OneNoteGamePage() {
       return
     }
 
-
-    /*
-    =====================================
-    SIGUIENTE CANCIÓN
-    =====================================
-    */
 
     const candidates =
       songs.filter(
@@ -2479,6 +2731,10 @@ export default function OneNoteGamePage() {
 
     autoPlayKeyRef.current =
       null
+
+
+    playbackStartedRef.current =
+      false
 
 
     const {
@@ -2581,13 +2837,13 @@ export default function OneNoteGamePage() {
     setMessage('')
 
 
-    /*
-    Destruimos completamente
-    Spotify de la partida anterior.
-    */
-
     clearTimeout(
       stopTimerRef.current
+    )
+
+
+    clearTimeout(
+      firstPlayFallbackTimerRef.current
     )
 
 
@@ -2603,6 +2859,15 @@ export default function OneNoteGamePage() {
       null
 
 
+    playbackStartedRef.current =
+      false
+
+
+    setNeedsFirstPlayTap(
+      false
+    )
+
+
     setSpotifyReady(
       false
     )
@@ -2616,11 +2881,6 @@ export default function OneNoteGamePage() {
     autoPlayKeyRef.current =
       null
 
-
-    /*
-    Lo vaciamos para garantizar
-    que el efecto vuelva a ejecutarse.
-    */
 
     setSong(
       null
@@ -2705,11 +2965,6 @@ export default function OneNoteGamePage() {
     )
 
 
-    /*
-    Primero dejamos que React monte
-    nuevamente el juego.
-    */
-
     setRoom(
       restartedRoom
     )
@@ -2719,11 +2974,6 @@ export default function OneNoteGamePage() {
       false
     )
 
-
-    /*
-    Luego cargamos canción para que
-    #one-note-spotify ya exista.
-    */
 
     setTimeout(
       async () => {
@@ -2977,12 +3227,6 @@ export default function OneNoteGamePage() {
       </div>
 
 
-      {/*
-      =====================================
-      RESULTADO DE RONDA
-      =====================================
-      */}
-
       {roundFinished ? (
 
         <div className="one-note-winner-card">
@@ -3070,12 +3314,6 @@ export default function OneNoteGamePage() {
 
       ) : !roundReady ? (
 
-        /*
-        =====================================
-        3...2...1
-        =====================================
-        */
-
         <div className="one-note-countdown">
 
           <span>
@@ -3094,12 +3332,6 @@ export default function OneNoteGamePage() {
 
         <>
 
-
-          {/*
-          =====================================
-          NIVELES
-          =====================================
-          */}
 
           <div className="one-note-progress">
 
@@ -3144,46 +3376,87 @@ export default function OneNoteGamePage() {
 
             <div className="one-note-host">
 
-              <button
-                className="one-note-play"
-                onClick={
-                  isPlaying
-                    ? stopFragment
-                    : playFragment
-                }
-                disabled={
-                  !spotifyReady ||
-                  !roundReady
-                }
-                title={
-                  isPlaying
-                    ? 'Pausar'
-                    : 'Repetir fragmento'
-                }
-              >
 
-                {isPlaying ? (
+              {/*
+              =====================================
+              FALLBACK PRIMER PLAY EN MÓVIL
+              =====================================
+              */}
 
-                  <Pause
-                    size={48}
-                    fill="currentColor"
-                  />
+              {needsFirstPlayTap ? (
 
-                ) : (
+                <button
+                  className="one-note-play one-note-first-play"
+                  onClick={
+                    manualFirstPlay
+                  }
+                  disabled={
+                    !spotifyReady
+                  }
+                  title="Tocar para escuchar"
+                >
 
                   <Play
                     size={48}
                     fill="currentColor"
                   />
 
-                )}
+                </button>
 
-              </button>
+              ) : (
+
+                <button
+                  className="one-note-play"
+                  onClick={
+                    isPlaying
+                      ? stopFragment
+                      : playFragment
+                  }
+                  disabled={
+                    !spotifyReady ||
+                    !roundReady
+                  }
+                  title={
+                    isPlaying
+                      ? 'Pausar'
+                      : 'Repetir fragmento'
+                  }
+                >
+
+                  {isPlaying ? (
+
+                    <Pause
+                      size={48}
+                      fill="currentColor"
+                    />
+
+                  ) : (
+
+                    <Play
+                      size={48}
+                      fill="currentColor"
+                    />
+
+                  )}
+
+                </button>
+
+              )}
 
 
-              <span>
-                {currentListen.duration}s
-              </span>
+              {needsFirstPlayTap ? (
+
+                <strong className="one-note-first-play-label">
+                  Tocar para escuchar
+                </strong>
+
+              ) : (
+
+                <span>
+                  {currentListen.duration}s
+                </span>
+
+              )}
 
 
               <div className="one-note-host-actions">
@@ -3527,12 +3800,6 @@ export default function OneNoteGamePage() {
 
       )}
 
-
-      {/*
-      =====================================
-      FLOTANTE GLOBAL
-      =====================================
-      */}
 
       {activePlayer &&
         !roundFinished &&
