@@ -27,26 +27,11 @@ import {
 
 
 const LISTEN_LEVELS = [
-  {
-    duration: 5,
-    label: '5s'
-  },
-  {
-    duration: 10,
-    label: '10s'
-  },
-  {
-    duration: 15,
-    label: '15s'
-  },
-  {
-    duration: 20,
-    label: '20s'
-  },
-  {
-    duration: 30,
-    label: '30s'
-  }
+  { duration: 5, label: '5s' },
+  { duration: 10, label: '10s' },
+  { duration: 15, label: '15s' },
+  { duration: 20, label: '20s' },
+  { duration: 30, label: '30s' }
 ]
 
 
@@ -70,9 +55,11 @@ function searchLibrary(
   const needle =
     normalizeText(search)
 
+
   if (!needle) {
     return []
   }
+
 
   return library
     .map(song => {
@@ -83,6 +70,7 @@ function searchLibrary(
         normalizeText(song.artist)
 
       let score = 0
+
 
       if (title === needle) {
         score = 100
@@ -103,6 +91,7 @@ function searchLibrary(
       ) {
         score = 60
       }
+
 
       return {
         song,
@@ -133,12 +122,6 @@ export default function OneNoteGamePage() {
     useNavigate()
 
 
-  /*
-  =====================================
-  DATOS
-  =====================================
-  */
-
   const [room, setRoom] =
     useState(null)
 
@@ -158,12 +141,6 @@ export default function OneNoteGamePage() {
     useState([])
 
 
-  /*
-  =====================================
-  BUSCADOR
-  =====================================
-  */
-
   const [query, setQuery] =
     useState('')
 
@@ -178,12 +155,6 @@ export default function OneNoteGamePage() {
   ] = useState([])
 
 
-  /*
-  =====================================
-  SPOTIFY
-  =====================================
-  */
-
   const [
     isPlaying,
     setIsPlaying
@@ -194,6 +165,7 @@ export default function OneNoteGamePage() {
     setSpotifyReady
   ] = useState(false)
 
+
   const iframeApiRef =
     useRef(null)
 
@@ -203,12 +175,9 @@ export default function OneNoteGamePage() {
   const stopTimerRef =
     useRef(null)
 
+  const autoPlayKeyRef =
+    useRef(null)
 
-  /*
-  =====================================
-  COUNTDOWN
-  =====================================
-  */
 
   const [
     countdown,
@@ -221,11 +190,15 @@ export default function OneNoteGamePage() {
   ] = useState(false)
 
 
-  /*
-  =====================================
-  ACCIONES
-  =====================================
-  */
+  const [
+    answerCountdown,
+    setAnswerCountdown
+  ] = useState(0)
+
+
+  const serverOffsetRef =
+    useRef(0)
+
 
   const [
     buzzing,
@@ -242,16 +215,13 @@ export default function OneNoteGamePage() {
     setSkippingSong
   ] = useState(false)
 
+  const timeoutRunningRef =
+    useRef(false)
+
 
   const [message, setMessage] =
     useState('')
 
-
-  /*
-  =====================================
-  DERIVADOS
-  =====================================
-  */
 
   const listenLevel =
     Number(
@@ -343,6 +313,15 @@ export default function OneNoteGamePage() {
     'queued'
 
 
+  /*
+  IMPORTANTE:
+
+  Ya NO bloqueamos Adivinar porque
+  otra persona esté respondiendo.
+
+  Los demás pueden entrar a la cola.
+  */
+
   const canBuzz =
     Boolean(
       room &&
@@ -350,7 +329,6 @@ export default function OneNoteGamePage() {
       room.status === 'playing' &&
       roundReady &&
       !roundFinished &&
-      !room.one_note_active_player_id &&
       !isMyTurn &&
       !myCurrentBuzz &&
       (
@@ -398,6 +376,8 @@ export default function OneNoteGamePage() {
 
   useEffect(() => {
     loadInitial()
+    syncServerClock()
+
 
     loadSpotifyIframeApi()
       .then(api => {
@@ -408,7 +388,19 @@ export default function OneNoteGamePage() {
         console.error(error)
       })
 
+
+    const clockInterval =
+      setInterval(
+        syncServerClock,
+        60000
+      )
+
+
     return () => {
+      clearInterval(
+        clockInterval
+      )
+
       clearTimeout(
         stopTimerRef.current
       )
@@ -419,6 +411,57 @@ export default function OneNoteGamePage() {
   }, [
     code
   ])
+
+
+  async function syncServerClock() {
+    const started =
+      Date.now()
+
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .rpc(
+          'get_server_time'
+        )
+
+
+    const finished =
+      Date.now()
+
+
+    if (
+      error ||
+      !data
+    ) {
+      return
+    }
+
+
+    const midpoint =
+      started +
+      (
+        finished -
+        started
+      ) / 2
+
+
+    serverOffsetRef.current =
+      new Date(
+        data
+      ).getTime() -
+      midpoint
+  }
+
+
+  function serverNow() {
+    return (
+      Date.now() +
+      serverOffsetRef.current
+    )
+  }
 
 
   async function loadInitial() {
@@ -464,6 +507,7 @@ export default function OneNoteGamePage() {
 
 
     let playerSession
+
 
     try {
       playerSession =
@@ -645,9 +689,7 @@ export default function OneNoteGamePage() {
     }
 
 
-    setSong(
-      data
-    )
+    setSong(data)
   }
 
 
@@ -698,7 +740,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  COUNTDOWN DE RONDA
+  COUNTDOWN NUEVA RONDA
   =====================================
   */
 
@@ -724,7 +766,7 @@ export default function OneNoteGamePage() {
 
       const remainingMs =
         startTime -
-        Date.now()
+        serverNow()
 
 
       if (
@@ -737,15 +779,11 @@ export default function OneNoteGamePage() {
       }
 
 
-      const remaining =
-        Math.ceil(
-          remainingMs / 1000
-        )
-
-
       setCountdown(
         Math.min(
-          remaining,
+          Math.ceil(
+            remainingMs / 1000
+          ),
           3
         )
       )
@@ -780,7 +818,6 @@ export default function OneNoteGamePage() {
   /*
   =====================================
   SPOTIFY
-  SOLO HOST
   =====================================
   */
 
@@ -870,9 +907,7 @@ export default function OneNoteGamePage() {
         controller.addListener(
           'ready',
           () => {
-            setSpotifyReady(
-              true
-            )
+            setSpotifyReady(true)
           }
         )
       }
@@ -880,15 +915,16 @@ export default function OneNoteGamePage() {
   }
 
 
-  function playFragment() {
+  function playDuration(
+    seconds
+  ) {
     if (
       !player?.is_host ||
       !controllerRef.current ||
       !spotifyReady ||
-      !roundReady ||
       roundFinished
     ) {
-      return
+      return false
     }
 
 
@@ -897,24 +933,42 @@ export default function OneNoteGamePage() {
     )
 
 
-    controllerRef.current
-      .restart()
+    try {
+      controllerRef.current
+        .restart()
 
 
-    setIsPlaying(true)
+      setIsPlaying(true)
 
 
-    stopTimerRef.current =
-      setTimeout(
-        () => {
-          controllerRef.current
-            ?.pause()
+      stopTimerRef.current =
+        setTimeout(
+          () => {
+            controllerRef.current
+              ?.pause()
 
-          setIsPlaying(false)
-        },
-        currentListen.duration *
-          1000
-      )
+            setIsPlaying(false)
+          },
+          seconds * 1000
+        )
+
+
+      return true
+
+    } catch (error) {
+      console.error(error)
+
+      setIsPlaying(false)
+
+      return false
+    }
+  }
+
+
+  function playFragment() {
+    playDuration(
+      currentListen.duration
+    )
   }
 
 
@@ -933,8 +987,58 @@ export default function OneNoteGamePage() {
 
 
   /*
-  Cuando alguien responde,
-  se pausa el audio.
+  AL TERMINAR 3...2...1
+
+  Intentamos reproducir automáticamente.
+
+  El botón Play queda visible como respaldo
+  si Safari / Spotify bloquean autoplay.
+  */
+
+  useEffect(() => {
+    if (
+      !player?.is_host ||
+      !roundReady ||
+      !spotifyReady ||
+      roundFinished ||
+      !room?.current_round
+    ) {
+      return
+    }
+
+
+    const key =
+      `${room.current_round}:0`
+
+
+    if (
+      autoPlayKeyRef.current ===
+      key
+    ) {
+      return
+    }
+
+
+    autoPlayKeyRef.current =
+      key
+
+
+    playDuration(
+      LISTEN_LEVELS[0].duration
+    )
+
+  }, [
+    player?.is_host,
+    roundReady,
+    spotifyReady,
+    room?.current_round,
+    roundFinished
+  ])
+
+
+  /*
+  En cuanto alguien entra a responder,
+  paramos el audio.
   */
 
   useEffect(() => {
@@ -950,11 +1054,6 @@ export default function OneNoteGamePage() {
   ])
 
 
-  /*
-  Al finalizar ronda,
-  también se pausa.
-  */
-
   useEffect(() => {
     if (
       player?.is_host &&
@@ -966,6 +1065,152 @@ export default function OneNoteGamePage() {
     roundFinished,
     player?.is_host
   ])
+
+
+  /*
+  =====================================
+  TIMER PARA RESPONDER
+  =====================================
+  */
+
+  useEffect(() => {
+    if (
+      !room?.one_note_active_player_id ||
+      !room?.one_note_turn_started_at ||
+      roundFinished
+    ) {
+      setAnswerCountdown(0)
+
+      timeoutRunningRef.current =
+        false
+
+      return
+    }
+
+
+    const updateTimer = () => {
+      const startedAt =
+        new Date(
+          room.one_note_turn_started_at
+        ).getTime()
+
+
+      const seconds =
+        Number(
+          room.one_note_answer_seconds ||
+          10
+        )
+
+
+      const endTime =
+        startedAt +
+        seconds * 1000
+
+
+      const remaining =
+        Math.max(
+          0,
+          Math.ceil(
+            (
+              endTime -
+              serverNow()
+            ) / 1000
+          )
+        )
+
+
+      setAnswerCountdown(
+        remaining
+      )
+
+
+      /*
+      El HOST es quien dispara el timeout.
+      Así evitamos que 5 celulares ejecuten
+      el RPC al mismo tiempo.
+      */
+
+      if (
+        remaining <= 0 &&
+        player?.is_host &&
+        !timeoutRunningRef.current
+      ) {
+        timeoutRunningRef.current =
+          true
+
+
+        timeoutActivePlayer(
+          room.one_note_active_player_id
+        )
+      }
+    }
+
+
+    timeoutRunningRef.current =
+      false
+
+
+    updateTimer()
+
+
+    const interval =
+      setInterval(
+        updateTimer,
+        150
+      )
+
+
+    return () => {
+      clearInterval(
+        interval
+      )
+    }
+  }, [
+    room?.one_note_active_player_id,
+    room?.one_note_turn_started_at,
+    room?.one_note_answer_seconds,
+    roundFinished,
+    player?.is_host
+  ])
+
+
+  async function timeoutActivePlayer(
+    activePlayerId
+  ) {
+    const {
+      error
+    } =
+      await supabase
+        .rpc(
+          'one_note_timeout_turn',
+          {
+            p_room_id:
+              room.id,
+
+            p_player_id:
+              activePlayerId
+          }
+        )
+
+
+    if (error) {
+      console.error(error)
+    }
+
+
+    await Promise.all([
+      refreshRoom(),
+
+      loadBuzzes(
+        room.id,
+        room.current_round
+      )
+    ])
+
+
+    timeoutRunningRef.current =
+      false
+  }
 
 
   /*
@@ -989,7 +1234,6 @@ export default function OneNoteGamePage() {
         .channel(
           `one-note-${roomId}`
         )
-
 
         .on(
           'postgres_changes',
@@ -1033,10 +1277,14 @@ export default function OneNoteGamePage() {
 
 
             if (roundChanged) {
+              autoPlayKeyRef.current =
+                null
+
               setQuery('')
               setSelectedGuess(null)
               setSearchResults([])
               setMessage('')
+
 
               await loadBuzzes(
                 updated.id,
@@ -1073,7 +1321,6 @@ export default function OneNoteGamePage() {
           }
         )
 
-
         .on(
           'postgres_changes',
           {
@@ -1095,7 +1342,6 @@ export default function OneNoteGamePage() {
           }
         )
 
-
         .on(
           'postgres_changes',
           {
@@ -1111,7 +1357,6 @@ export default function OneNoteGamePage() {
             )
           }
         )
-
 
         .subscribe()
 
@@ -1130,7 +1375,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  RESPALDO DE SINCRONIZACIÓN
+  SINCRONIZACIÓN DE RESPALDO
   =====================================
   */
 
@@ -1148,7 +1393,7 @@ export default function OneNoteGamePage() {
         async () => {
           const {
             data: freshRoom,
-            error: roomError
+            error
           } =
             await supabase
               .from('rooms')
@@ -1161,10 +1406,10 @@ export default function OneNoteGamePage() {
 
 
           if (
-            !roomError &&
+            !error &&
             freshRoom
           ) {
-            const oldSongId =
+            const oldSong =
               room.current_song_id
 
 
@@ -1176,7 +1421,7 @@ export default function OneNoteGamePage() {
             if (
               freshRoom.current_song_id &&
               freshRoom.current_song_id !==
-                oldSongId
+                oldSong
             ) {
               await loadSong(
                 freshRoom.current_song_id
@@ -1214,7 +1459,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  ADIVINAR
+  BUZZ
   =====================================
   */
 
@@ -1270,7 +1515,10 @@ export default function OneNoteGamePage() {
       ])
 
 
-      if (data) {
+      if (
+        data &&
+        Number(data) > 1
+      ) {
         setMessage(
           `Entraste #${data}`
         )
@@ -1437,6 +1685,7 @@ export default function OneNoteGamePage() {
 
 
     const {
+      data,
       error
     } =
       await supabase
@@ -1461,6 +1710,10 @@ export default function OneNoteGamePage() {
     }
 
 
+    const nextLevel =
+      Number(data)
+
+
     await Promise.all([
       refreshRoom(),
 
@@ -1469,12 +1722,34 @@ export default function OneNoteGamePage() {
         room.current_round
       )
     ])
+
+
+    /*
+    Como esto ocurre directamente
+    después de tocar Escuchar más,
+    es una interacción del usuario.
+
+    Por eso Spotify debería dejar
+    reproducirlo incluso en móvil.
+    */
+
+    if (
+      LISTEN_LEVELS[
+        nextLevel
+      ]
+    ) {
+      playDuration(
+        LISTEN_LEVELS[
+          nextLevel
+        ].duration
+      )
+    }
   }
 
 
   /*
   =====================================
-  SALTAR CANCIÓN
+  SALTAR
   =====================================
   */
 
@@ -1568,6 +1843,9 @@ export default function OneNoteGamePage() {
             'finished',
 
           current_song_id:
+            null,
+
+          one_note_turn_started_at:
             null
         })
         .eq(
@@ -1606,6 +1884,10 @@ export default function OneNoteGamePage() {
       ]
 
 
+    autoPlayKeyRef.current =
+      null
+
+
     const {
       error
     } =
@@ -1627,6 +1909,9 @@ export default function OneNoteGamePage() {
           one_note_winner_player_id:
             null,
 
+          one_note_turn_started_at:
+            null,
+
           one_note_result:
             null
         })
@@ -1646,7 +1931,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  RESULTADOS FINALES
+  FINAL
   =====================================
   */
 
@@ -1745,12 +2030,6 @@ export default function OneNoteGamePage() {
   }
 
 
-  /*
-  =====================================
-  UI
-  =====================================
-  */
-
   return (
     <section className="one-note-game">
 
@@ -1789,12 +2068,6 @@ export default function OneNoteGamePage() {
 
       </div>
 
-
-      {/*
-      =====================================
-      RESULTADO DE RONDA
-      =====================================
-      */}
 
       {roundFinished ? (
 
@@ -1860,7 +2133,6 @@ export default function OneNoteGamePage() {
 
               <ArrowRight size={18} />
 
-
               {room.current_round >=
               room.total_rounds
                 ? 'Ver resultados'
@@ -1881,18 +2153,11 @@ export default function OneNoteGamePage() {
 
       ) : !roundReady ? (
 
-        /*
-        =====================================
-        COUNTDOWN
-        =====================================
-        */
-
         <div className="one-note-countdown">
 
           <span>
             PREPÁRENSE
           </span>
-
 
           <strong>
             {countdown || 1}
@@ -1905,12 +2170,6 @@ export default function OneNoteGamePage() {
 
         <>
 
-
-          {/*
-          =====================================
-          NIVELES
-          =====================================
-          */}
 
           <div className="one-note-progress">
 
@@ -1945,12 +2204,6 @@ export default function OneNoteGamePage() {
           </div>
 
 
-          {/*
-          =====================================
-          HOST
-          =====================================
-          */}
-
           {player.is_host && (
 
             <div className="one-note-host">
@@ -1965,6 +2218,11 @@ export default function OneNoteGamePage() {
                 disabled={
                   !spotifyReady ||
                   !roundReady
+                }
+                title={
+                  isPlaying
+                    ? 'Pausar'
+                    : 'Repetir fragmento'
                 }
               >
 
@@ -2022,7 +2280,6 @@ export default function OneNoteGamePage() {
                     skippingSong
                   }
                   title="Saltar canción"
-                  aria-label="Saltar canción"
                 >
 
                   <SkipForward
@@ -2037,12 +2294,6 @@ export default function OneNoteGamePage() {
 
           )}
 
-
-          {/*
-          =====================================
-          BOTÓN / ESTADO JUGADOR
-          =====================================
-          */}
 
           {!isMyTurn && (
 
@@ -2122,19 +2373,21 @@ export default function OneNoteGamePage() {
           )}
 
 
-          {/*
-          =====================================
-          RESPONDER
-          =====================================
-          */}
-
           {isMyTurn && (
 
             <div className="one-note-answer">
 
-              <strong>
-                Tu turno
-              </strong>
+              <div className="one-note-answer-heading">
+
+                <strong>
+                  Tu turno
+                </strong>
+
+                <b>
+                  {answerCountdown}
+                </b>
+
+              </div>
 
 
               <div className="autocomplete">
@@ -2147,6 +2400,7 @@ export default function OneNoteGamePage() {
                   <input
                     value={query}
                     placeholder="Busca la canción..."
+                    autoFocus
                     onChange={
                       event => {
                         setQuery(
@@ -2212,7 +2466,8 @@ export default function OneNoteGamePage() {
                 }
                 disabled={
                   !selectedGuess ||
-                  submitting
+                  submitting ||
+                  answerCountdown <= 0
                 }
               >
 
@@ -2226,12 +2481,6 @@ export default function OneNoteGamePage() {
 
           )}
 
-
-          {/*
-          =====================================
-          ORDEN
-          =====================================
-          */}
 
           <div className="one-note-queue">
 
@@ -2322,12 +2571,6 @@ export default function OneNoteGamePage() {
       )}
 
 
-      {/*
-      =====================================
-      FLOTANTE GLOBAL
-      =====================================
-      */}
-
       {activePlayer &&
         !roundFinished &&
         roundReady && (
@@ -2340,9 +2583,14 @@ export default function OneNoteGamePage() {
 
               {isMyTurn
                 ? 'Tu turno'
-                : `${activePlayer.player_name} está respondiendo...`}
+                : `${activePlayer.player_name} está respondiendo`}
 
             </span>
+
+
+            <strong className="one-note-overlay-timer">
+              {answerCountdown}
+            </strong>
 
           </div>
 

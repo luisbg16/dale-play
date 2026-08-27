@@ -25,6 +25,12 @@ const ROUND_OPTIONS = [
   20
 ]
 
+const ANSWER_TIME_OPTIONS = [
+  5,
+  10,
+  15
+]
+
 
 function generateCode() {
   const chars =
@@ -55,12 +61,6 @@ export default function RoomsPage() {
     useNavigate()
 
 
-  /*
-  =====================================
-  CREAR SALA
-  =====================================
-  */
-
   const [hostName, setHostName] =
     useState('')
 
@@ -76,16 +76,15 @@ export default function RoomsPage() {
   ] = useState(true)
 
   const [
+    answerSeconds,
+    setAnswerSeconds
+  ] = useState(10)
+
+  const [
     creatingRoom,
     setCreatingRoom
   ] = useState(false)
 
-
-  /*
-  =====================================
-  UNIRSE
-  =====================================
-  */
 
   const [joinName, setJoinName] =
     useState('')
@@ -98,12 +97,6 @@ export default function RoomsPage() {
     setJoiningRoom
   ] = useState(false)
 
-
-  /*
-  =====================================
-  LOBBY
-  =====================================
-  */
 
   const [
     createdRoom,
@@ -120,12 +113,6 @@ export default function RoomsPage() {
     useState('')
 
 
-  /*
-  =====================================
-  ELEGIR MODO
-  =====================================
-  */
-
   function chooseMode(mode) {
     setGameMode(mode)
     setMessage('')
@@ -137,12 +124,6 @@ export default function RoomsPage() {
     setMessage('')
   }
 
-
-  /*
-  =====================================
-  CREAR SALA
-  =====================================
-  */
 
   async function createRoom() {
     const cleanName =
@@ -213,6 +194,11 @@ export default function RoomsPage() {
                   ? allowRetries
                   : true,
 
+              one_note_answer_seconds:
+                gameMode === 'one_note'
+                  ? answerSeconds
+                  : 10,
+
               one_note_level:
                 0,
 
@@ -220,6 +206,12 @@ export default function RoomsPage() {
                 null,
 
               one_note_winner_player_id:
+                null,
+
+              one_note_turn_started_at:
+                null,
+
+              one_note_result:
                 null
             })
             .select()
@@ -322,12 +314,6 @@ export default function RoomsPage() {
     }
   }
 
-
-  /*
-  =====================================
-  LOBBY REALTIME
-  =====================================
-  */
 
   useEffect(() => {
     if (
@@ -441,12 +427,6 @@ export default function RoomsPage() {
     )
   }
 
-
-  /*
-  =====================================
-  UNIRSE
-  =====================================
-  */
 
   async function joinRoom() {
     const cleanName =
@@ -582,12 +562,6 @@ export default function RoomsPage() {
   }
 
 
-  /*
-  =====================================
-  INICIAR PARTIDA
-  =====================================
-  */
-
   async function startGame() {
     if (!createdRoom) {
       return
@@ -681,6 +655,12 @@ export default function RoomsPage() {
           one_note_winner_player_id:
             null,
 
+          one_note_turn_started_at:
+            null,
+
+          one_note_result:
+            null,
+
           round_started_at:
             new Date()
               .toISOString()
@@ -717,12 +697,6 @@ export default function RoomsPage() {
     )
   }
 
-
-  /*
-  =====================================
-  LOBBY
-  =====================================
-  */
 
   if (
     createdRoom
@@ -787,15 +761,17 @@ export default function RoomsPage() {
 
             {createdRoom.game_mode ===
               'one_note' && (
+              <>
+                <span>
+                  {createdRoom.allow_retries
+                    ? 'Reintentos activados'
+                    : 'Sin reintentos'}
+                </span>
 
-              <span>
-
-                {createdRoom.allow_retries
-                  ? 'Reintentos activados'
-                  : 'Sin reintentos'}
-
-              </span>
-
+                <span>
+                  {createdRoom.one_note_answer_seconds || 10}s para responder
+                </span>
+              </>
             )}
 
           </div>
@@ -868,12 +844,6 @@ export default function RoomsPage() {
   }
 
 
-  /*
-  =====================================
-  CREAR / UNIRSE
-  =====================================
-  */
-
   return (
     <section className="rooms-wrap">
 
@@ -889,12 +859,6 @@ export default function RoomsPage() {
 
       </div>
 
-
-      {/*
-      =====================================
-      PASO 1: ELEGIR MODO
-      =====================================
-      */}
 
       <div className="room-mode-selector">
 
@@ -959,12 +923,6 @@ export default function RoomsPage() {
 
       </div>
 
-
-      {/*
-      =====================================
-      PASO 2: PERSONALIZAR
-      =====================================
-      */}
 
       {gameMode && (
 
@@ -1071,52 +1029,93 @@ export default function RoomsPage() {
 
             {gameMode ===
               'one_note' && (
+              <>
 
-              <div className="room-retry-setting">
-
-                <div>
-
-                  <strong>
-                    Permitir reintentos
-                  </strong>
-
+                <div className="room-field">
 
                   <span>
-
-                    {allowRetries
-                      ? 'Pueden volver a intentar en la siguiente escucha.'
-                      : 'Si fallan, quedan fuera de esa canción.'}
-
+                    Tiempo para responder
                   </span>
+
+
+                  <div className="room-answer-time-options">
+
+                    {ANSWER_TIME_OPTIONS.map(
+                      option => (
+
+                        <button
+                          key={option}
+                          type="button"
+                          className={
+                            answerSeconds ===
+                            option
+                              ? 'active'
+                              : ''
+                          }
+                          onClick={
+                            () =>
+                              setAnswerSeconds(
+                                option
+                              )
+                          }
+                        >
+                          {option}s
+                        </button>
+
+                      )
+                    )}
+
+                  </div>
 
                 </div>
 
 
-                <button
-                  type="button"
-                  className={
-                    `room-switch ${
-                      allowRetries
-                        ? 'on'
-                        : ''
-                    }`
-                  }
-                  onClick={
-                    () =>
-                      setAllowRetries(
-                        current =>
-                          !current
-                      )
-                  }
-                  aria-label="Permitir reintentos"
-                >
+                <div className="room-retry-setting">
 
-                  <span />
+                  <div>
 
-                </button>
+                    <strong>
+                      Permitir reintentos
+                    </strong>
 
-              </div>
 
+                    <span>
+
+                      {allowRetries
+                        ? 'Pueden volver a intentar en la siguiente escucha.'
+                        : 'Si fallan, quedan fuera de esa canción.'}
+
+                    </span>
+
+                  </div>
+
+
+                  <button
+                    type="button"
+                    className={
+                      `room-switch ${
+                        allowRetries
+                          ? 'on'
+                          : ''
+                      }`
+                    }
+                    onClick={
+                      () =>
+                        setAllowRetries(
+                          current =>
+                            !current
+                        )
+                    }
+                    aria-label="Permitir reintentos"
+                  >
+
+                    <span />
+
+                  </button>
+
+                </div>
+
+              </>
             )}
 
 
@@ -1142,12 +1141,6 @@ export default function RoomsPage() {
 
       )}
 
-
-      {/*
-      =====================================
-      ENTRAR A SALA
-      =====================================
-      */}
 
       <div className="room-join-section">
 

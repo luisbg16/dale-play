@@ -5807,3 +5807,114 @@ strong {
     font-size: 6rem;
   }
 }
+/* =====================================
+   TIEMPO DE RESPUESTA EN CREAR SALA
+   ===================================== */
+
+.room-answer-time-options {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 7px;
+}
+
+.room-answer-time-options button {
+  min-height: 42px;
+
+  border-radius: 12px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.08);
+
+  background:
+    rgba(255,255,255,.025);
+
+  color:
+    rgba(255,255,255,.55);
+
+  font-size: .78rem;
+  font-weight: 850;
+
+  cursor: pointer;
+}
+
+.room-answer-time-options button.active {
+  border-color:
+    rgba(255,132,56,.45);
+
+  background:
+    rgba(255,132,56,.08);
+
+  color: #fff;
+}
+
+
+/* =====================================
+   TIMER DEL JUGADOR
+   ===================================== */
+
+.one-note-answer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  margin-bottom: 12px;
+}
+
+.one-note-answer-heading > strong {
+  margin: 0;
+}
+
+.one-note-answer-heading > b {
+  min-width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background:
+    rgba(255,132,56,.1);
+
+  color: #ff8438;
+
+  font-size: .85rem;
+}
+
+
+/* =====================================
+   TIMER FLOTANTE PARA TODOS
+   ===================================== */
+
+.one-note-answer-overlay-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+}
+
+.one-note-overlay-timer {
+  width: 27px;
+  height: 27px;
+
+  display: grid;
+  place-items: center;
+
+  flex: 0 0 27px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(255,132,56,.12);
+
+  color: #ff8438;
+
+  font-size: .72rem;
+  font-weight: 900;
+}
