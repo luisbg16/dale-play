@@ -196,6 +196,9 @@ export default function OneNoteGamePage() {
   const autoPlayKeyRef =
     useRef(null)
 
+  const spotifyPreparingRef =
+    useRef(false)
+
 
   /*
   =====================================
@@ -256,7 +259,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  RESULTADOS FINALES
+  RESULTADOS
   =====================================
   */
 
@@ -264,6 +267,9 @@ export default function OneNoteGamePage() {
     loadingFinalResults,
     setLoadingFinalResults
   ] = useState(false)
+
+  const finishingRef =
+    useRef(false)
 
 
   const [message, setMessage] =
@@ -366,11 +372,6 @@ export default function OneNoteGamePage() {
     'queued'
 
 
-  /*
-  Mientras alguien responde,
-  los demás SÍ pueden entrar a la cola.
-  */
-
   const canBuzz =
     Boolean(
       room &&
@@ -455,8 +456,12 @@ export default function OneNoteGamePage() {
         stopTimerRef.current
       )
 
-      controllerRef.current
-        ?.destroy?.()
+      try {
+        controllerRef.current
+          ?.destroy?.()
+      } catch {
+        // nada
+      }
     }
   }, [
     code
@@ -591,8 +596,8 @@ export default function OneNoteGamePage() {
 
 
     /*
-    Si entramos o recargamos una partida
-    ya terminada, primero cargamos ranking.
+    Si entramos a partida ya terminada,
+    cargamos primero jugadores.
     */
 
     if (
@@ -632,15 +637,18 @@ export default function OneNoteGamePage() {
       }
 
 
+      await loadSongs()
+
+
       setRoom(
         roomData
       )
+
 
       setLoadingFinalResults(
         false
       )
 
-      await loadSongs()
 
       return
     }
@@ -981,151 +989,188 @@ export default function OneNoteGamePage() {
   */
 
   useEffect(() => {
-  if (
-    !song?.spotify_id ||
-    !player?.is_host ||
-    room?.status !== 'playing'
-  ) {
-    return
-  }
-
-
-  let cancelled =
-    false
-
-
-  async function initializeSpotify() {
-
-    await prepareSpotify(
-      song.spotify_id
-    )
-
-
-    /*
-    Si React todavía no había montado
-    el contenedor, damos un segundo intento.
-    */
-
     if (
-      !cancelled &&
-      !controllerRef.current
+      !song?.spotify_id ||
+      !player?.is_host ||
+      room?.status !== 'playing'
     ) {
-
-      setTimeout(
-        () => {
-
-          if (
-            !cancelled &&
-            !controllerRef.current
-          ) {
-            prepareSpotify(
-              song.spotify_id
-            )
-          }
-
-        },
-        250
-      )
-
+      return
     }
 
-  }
+
+    let cancelled =
+      false
 
 
-  initializeSpotify()
+    async function initializeSpotify() {
+      await prepareSpotify(
+        song.spotify_id
+      )
 
 
-  return () => {
-    cancelled =
-      true
-  }
+      if (
+        !cancelled &&
+        !controllerRef.current
+      ) {
+        setTimeout(
+          () => {
+            if (
+              !cancelled &&
+              !controllerRef.current
+            ) {
+              prepareSpotify(
+                song.spotify_id
+              )
+            }
+          },
+          250
+        )
+      }
+    }
 
-}, [
-  song?.spotify_id,
-  player?.is_host,
-  room?.status
-])
+
+    initializeSpotify()
+
+
+    return () => {
+      cancelled =
+        true
+    }
+
+  }, [
+    song?.spotify_id,
+    player?.is_host,
+    room?.status
+  ])
 
 
   async function prepareSpotify(
     spotifyId
   ) {
-    const api =
-      iframeApiRef.current ||
-      await loadSpotifyIframeApi()
-
-
-    iframeApiRef.current =
-      api
-
-
-    const uri =
-      `spotify:track:${spotifyId}`
-
-
-    setSpotifyReady(
-      false
-    )
-
-
     if (
-      controllerRef.current
+      !spotifyId ||
+      spotifyPreparingRef.current
     ) {
-      controllerRef.current
-        .loadEntity(
-          uri,
-          false,
-          0
-        )
+      return
+    }
 
 
-      setTimeout(
-        () => {
-          setSpotifyReady(
-            true
+    spotifyPreparingRef.current =
+      true
+
+
+    try {
+      const api =
+        iframeApiRef.current ||
+        await loadSpotifyIframeApi()
+
+
+      iframeApiRef.current =
+        api
+
+
+      const uri =
+        `spotify:track:${spotifyId}`
+
+
+      setSpotifyReady(
+        false
+      )
+
+
+      if (
+        controllerRef.current
+      ) {
+        controllerRef.current
+          .loadEntity(
+            uri,
+            false,
+            0
           )
-        },
-        450
-      )
 
 
-      return
-    }
-
-
-    const element =
-      document.getElementById(
-        'one-note-spotify'
-      )
-
-
-    if (!element) {
-      return
-    }
-
-
-    api.createController(
-      element,
-      {
-        width: '100%',
-        height: 80,
-        uri
-      },
-      controller => {
-        controllerRef.current =
-          controller
-
-
-        controller.addListener(
-          'ready',
+        setTimeout(
           () => {
             setSpotifyReady(
               true
             )
-          }
+          },
+          450
+        )
+
+
+        return
+      }
+
+
+      let element =
+        null
+
+
+      for (
+        let attempt = 0;
+        attempt < 10;
+        attempt += 1
+      ) {
+        element =
+          document.getElementById(
+            'one-note-spotify'
+          )
+
+
+        if (element) {
+          break
+        }
+
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              60
+            )
         )
       }
-    )
+
+
+      if (!element) {
+        return
+      }
+
+
+      api.createController(
+        element,
+        {
+          width: '100%',
+          height: 80,
+          uri
+        },
+        controller => {
+          controllerRef.current =
+            controller
+
+
+          controller.addListener(
+            'ready',
+            () => {
+              setSpotifyReady(
+                true
+              )
+            }
+          )
+        }
+      )
+
+
+    } catch (error) {
+      console.error(
+        error
+      )
+
+    } finally {
+      spotifyPreparingRef.current =
+        false
+    }
   }
 
 
@@ -1169,12 +1214,12 @@ export default function OneNoteGamePage() {
             controllerRef.current
               ?.pause()
 
+
             setIsPlaying(
               false
             )
           },
-          seconds *
-          1000
+          seconds * 1000
         )
 
 
@@ -1214,8 +1259,7 @@ export default function OneNoteGamePage() {
 
 
   /*
-  Al terminar el 3...2...1,
-  intentamos reproducir automáticamente.
+  Autoplay al terminar 3...2...1
   */
 
   useEffect(() => {
@@ -1261,8 +1305,8 @@ export default function OneNoteGamePage() {
 
 
   /*
-  Cuando alguien responde,
-  paramos audio.
+  Si alguien responde,
+  pausamos audio.
   */
 
   useEffect(() => {
@@ -1279,8 +1323,8 @@ export default function OneNoteGamePage() {
 
 
   /*
-  Cuando termina la ronda,
-  paramos audio.
+  Si termina ronda,
+  pausamos audio.
   */
 
   useEffect(() => {
@@ -1490,13 +1534,16 @@ export default function OneNoteGamePage() {
 
             /*
             =====================================
-            IMPORTANTE:
-            RESULTADOS FINALES
+            FINISHED
 
-            Primero cargamos players.
-            DESPUÉS cambiamos room a finished.
+            Si el HOST está terminando la partida
+            manualmente, NO tocamos nada aquí.
 
-            Esto evita pantalla negra.
+            nextRound() ya se encargará de cargar
+            ranking + room en el orden correcto.
+
+            Esto elimina la carrera que dejaba
+            pantalla negra.
             =====================================
             */
 
@@ -1504,6 +1551,14 @@ export default function OneNoteGamePage() {
               updated.status ===
               'finished'
             ) {
+              if (
+                player?.is_host &&
+                finishingRef.current
+              ) {
+                return
+              }
+
+
               stopFragment()
 
 
@@ -1553,10 +1608,6 @@ export default function OneNoteGamePage() {
               return
             }
 
-
-            /*
-            Partida normal.
-            */
 
             setRoom(
               updated
@@ -1662,7 +1713,8 @@ export default function OneNoteGamePage() {
   }, [
     room?.id,
     room?.current_round,
-    room?.current_song_id
+    room?.current_song_id,
+    player?.is_host
   ])
 
 
@@ -1685,6 +1737,20 @@ export default function OneNoteGamePage() {
     const syncInterval =
       setInterval(
         async () => {
+          /*
+          Mientras el host está ejecutando
+          el cierre final, polling tampoco
+          interviene.
+          */
+
+          if (
+            player?.is_host &&
+            finishingRef.current
+          ) {
+            return
+          }
+
+
           const {
             data: freshRoom,
             error
@@ -1700,62 +1766,48 @@ export default function OneNoteGamePage() {
 
 
           if (
-            !error &&
-            freshRoom
+            error ||
+            !freshRoom
           ) {
-            /*
-            Si detectamos finished por polling,
-            hacemos exactamente lo mismo que Realtime.
-            */
+            return
+          }
+
+
+          if (
+            freshRoom.status ===
+            'finished'
+          ) {
+            setLoadingFinalResults(
+              true
+            )
+
+
+            const {
+              data: finalPlayers,
+              error: finalPlayersError
+            } =
+              await supabase
+                .from('room_players')
+                .select('*')
+                .eq(
+                  'room_id',
+                  freshRoom.id
+                )
+                .order(
+                  'score',
+                  {
+                    ascending: false
+                  }
+                )
+
 
             if (
-              freshRoom.status ===
-              'finished'
+              !finalPlayersError
             ) {
-              setLoadingFinalResults(
-                true
-              )
-
-
-              const {
-                data: finalPlayers
-              } =
-                await supabase
-                  .from('room_players')
-                  .select('*')
-                  .eq(
-                    'room_id',
-                    freshRoom.id
-                  )
-                  .order(
-                    'score',
-                    {
-                      ascending: false
-                    }
-                  )
-
-
               setPlayers(
                 finalPlayers || []
               )
-
-
-              setRoom(
-                freshRoom
-              )
-
-
-              setLoadingFinalResults(
-                false
-              )
-
-
-              return
             }
-
-
-            const oldSong =
-              room.current_song_id
 
 
             setRoom(
@@ -1763,28 +1815,45 @@ export default function OneNoteGamePage() {
             )
 
 
-            if (
-              freshRoom.current_song_id &&
-              freshRoom.current_song_id !==
-                oldSong
-            ) {
-              await loadSong(
-                freshRoom.current_song_id
-              )
-            }
+            setLoadingFinalResults(
+              false
+            )
 
 
-            await Promise.all([
-              loadBuzzes(
-                freshRoom.id,
-                freshRoom.current_round
-              ),
-
-              loadPlayers(
-                freshRoom.id
-              )
-            ])
+            return
           }
+
+
+          const oldSong =
+            room.current_song_id
+
+
+          setRoom(
+            freshRoom
+          )
+
+
+          if (
+            freshRoom.current_song_id &&
+            freshRoom.current_song_id !==
+              oldSong
+          ) {
+            await loadSong(
+              freshRoom.current_song_id
+            )
+          }
+
+
+          await Promise.all([
+            loadBuzzes(
+              freshRoom.id,
+              freshRoom.current_round
+            ),
+
+            loadPlayers(
+              freshRoom.id
+            )
+          ])
         },
         1000
       )
@@ -1799,7 +1868,8 @@ export default function OneNoteGamePage() {
     room?.id,
     room?.current_round,
     room?.current_song_id,
-    room?.status
+    room?.status,
+    player?.is_host
   ])
 
 
@@ -2083,10 +2153,6 @@ export default function OneNoteGamePage() {
     ])
 
 
-    /*
-    Escuchar más reproduce inmediatamente.
-    */
-
     if (
       LISTEN_LEVELS[
         nextLevel
@@ -2178,7 +2244,7 @@ export default function OneNoteGamePage() {
 
   /*
   =====================================
-  SIGUIENTE RONDA
+  SIGUIENTE RONDA / RESULTADOS
   =====================================
   */
 
@@ -2196,6 +2262,14 @@ export default function OneNoteGamePage() {
     /*
     =====================================
     ÚLTIMA RONDA
+
+    ESTE ES EL ARREGLO PRINCIPAL.
+
+    El host controla completamente
+    la transición a resultados.
+
+    Realtime y polling se ignoran
+    temporalmente mediante finishingRef.
     =====================================
     */
 
@@ -2203,107 +2277,168 @@ export default function OneNoteGamePage() {
       room.current_round >=
       room.total_rounds
     ) {
+      if (
+        finishingRef.current
+      ) {
+        return
+      }
+
+
+      finishingRef.current =
+        true
+
+
       setLoadingFinalResults(
         true
       )
 
+      setMessage('')
 
-      const {
-        error
-      } =
-        await supabase
-          .from('rooms')
-          .update({
-            status:
-              'finished',
 
-            current_song_id:
-              null,
+      try {
+        /*
+        Primero cambiamos DB a finished.
+        */
 
-            one_note_turn_started_at:
-              null
-          })
-          .eq(
-            'id',
-            room.id
+        const {
+          error: finishError
+        } =
+          await supabase
+            .from('rooms')
+            .update({
+              status:
+                'finished',
+
+              current_song_id:
+                null,
+
+              one_note_turn_started_at:
+                null
+            })
+            .eq(
+              'id',
+              room.id
+            )
+
+
+        if (finishError) {
+          throw finishError
+        }
+
+
+        /*
+        Después cargamos ranking.
+        */
+
+        const {
+          data: finalPlayers,
+          error: playersError
+        } =
+          await supabase
+            .from('room_players')
+            .select('*')
+            .eq(
+              'room_id',
+              room.id
+            )
+            .order(
+              'score',
+              {
+                ascending: false
+              }
+            )
+
+
+        if (playersError) {
+          throw playersError
+        }
+
+
+        /*
+        Finalmente cargamos la sala ya
+        terminada.
+        */
+
+        const {
+          data: finalRoom,
+          error: roomError
+        } =
+          await supabase
+            .from('rooms')
+            .select('*')
+            .eq(
+              'id',
+              room.id
+            )
+            .single()
+
+
+        if (
+          roomError ||
+          !finalRoom
+        ) {
+          throw (
+            roomError ||
+            new Error(
+              'No pude cargar los resultados.'
+            )
           )
+        }
 
 
-      if (error) {
+        /*
+        El orden importa:
+
+        1. players
+        2. room finished
+        3. quitar loading
+        */
+
+        setPlayers(
+          finalPlayers || []
+        )
+
+
+        setRoom(
+          finalRoom
+        )
+
+
+        setLoadingFinalResults(
+          false
+        )
+
+
+      } catch (error) {
+        console.error(error)
+
+
         setLoadingFinalResults(
           false
         )
 
 
         setMessage(
-          error.message
+          error.message ||
+          'No se pudieron cargar los resultados.'
         )
 
-        return
-      }
 
+      } finally {
+        /*
+        Damos un instante después de que
+        React ya renderizó resultados antes
+        de volver a permitir Realtime.
+        */
 
-      /*
-      Además de esperar Realtime,
-      el propio host carga el ranking
-      inmediatamente.
-      */
-
-      const {
-        data: finalPlayers,
-        error: finalPlayersError
-      } =
-        await supabase
-          .from('room_players')
-          .select('*')
-          .eq(
-            'room_id',
-            room.id
-          )
-          .order(
-            'score',
-            {
-              ascending: false
-            }
-          )
-
-
-      if (
-        !finalPlayersError
-      ) {
-        setPlayers(
-          finalPlayers || []
+        setTimeout(
+          () => {
+            finishingRef.current =
+              false
+          },
+          500
         )
       }
-
-
-      const {
-        data: finalRoom,
-        error: finalRoomError
-      } =
-        await supabase
-          .from('rooms')
-          .select('*')
-          .eq(
-            'id',
-            room.id
-          )
-          .single()
-
-
-      if (
-        !finalRoomError &&
-        finalRoom
-      ) {
-        setRoom(
-          finalRoom
-        )
-      }
-
-
-      setLoadingFinalResults(
-        false
-      )
 
 
       return
@@ -2392,254 +2527,220 @@ export default function OneNoteGamePage() {
   JUGAR DE NUEVO
   =====================================
   */
-async function playAgain() {
-  if (
-    !player?.is_host ||
-    loadingFinalResults
-  ) {
-    return
-  }
+
+  async function playAgain() {
+    if (
+      !player?.is_host ||
+      loadingFinalResults
+    ) {
+      return
+    }
 
 
-  let availableSongs =
-    songs.filter(
-      item =>
-        Boolean(
-          item.spotify_id
+    let availableSongs =
+      songs.filter(
+        item =>
+          Boolean(
+            item.spotify_id
+          )
+      )
+
+
+    if (
+      !availableSongs.length
+    ) {
+      availableSongs =
+        await loadSongs()
+    }
+
+
+    if (
+      !availableSongs.length
+    ) {
+      setMessage(
+        'No hay canciones disponibles.'
+      )
+
+      return
+    }
+
+
+    const firstSong =
+      availableSongs[
+        Math.floor(
+          Math.random() *
+          availableSongs.length
         )
+      ]
+
+
+    setLoadingFinalResults(
+      true
+    )
+
+    setMessage('')
+
+
+    /*
+    Destruimos completamente
+    Spotify de la partida anterior.
+    */
+
+    clearTimeout(
+      stopTimerRef.current
     )
 
 
-  if (
-    !availableSongs.length
-  ) {
-    availableSongs =
-      await loadSongs()
-  }
+    try {
+      controllerRef.current
+        ?.destroy?.()
+    } catch (error) {
+      console.warn(error)
+    }
 
 
-  if (
-    !availableSongs.length
-  ) {
-    setMessage(
-      'No hay canciones disponibles.'
+    controllerRef.current =
+      null
+
+
+    setSpotifyReady(
+      false
     )
 
-    return
-  }
+
+    setIsPlaying(
+      false
+    )
 
 
-  const firstSong =
-    availableSongs[
-      Math.floor(
-        Math.random() *
-        availableSongs.length
-      )
-    ]
+    autoPlayKeyRef.current =
+      null
 
 
-  setLoadingFinalResults(
-    true
-  )
+    /*
+    Lo vaciamos para garantizar
+    que el efecto vuelva a ejecutarse.
+    */
 
-  setMessage('')
-
-
-  /*
-  =====================================
-  LIMPIAMOS COMPLETAMENTE SPOTIFY
-  =====================================
-
-  El controller anterior estaba unido
-  al iframe de la partida anterior.
-  */
-
-  clearTimeout(
-    stopTimerRef.current
-  )
+    setSong(
+      null
+    )
 
 
-  try {
-    controllerRef.current
-      ?.destroy?.()
-  } catch (error) {
-    console.warn(
-      'No se pudo destruir el controller anterior',
+    const {
       error
-    )
-  }
+    } =
+      await supabase
+        .rpc(
+          'restart_one_note_game',
+          {
+            p_room_id:
+              room.id,
+
+            p_host_player_id:
+              player.player_id,
+
+            p_song_id:
+              firstSong.id
+          }
+        )
 
 
-  controllerRef.current =
-    null
-
-
-  setSpotifyReady(
-    false
-  )
-
-  setIsPlaying(
-    false
-  )
-
-
-  /*
-  Evitamos que el autoplay piense
-  que esta ronda ya se reprodujo.
-  */
-
-  autoPlayKeyRef.current =
-    null
-
-
-  /*
-  Dejamos song vacío para garantizar
-  que el efecto de Spotify vuelva
-  a ejecutarse aunque salga elegida
-  la misma canción que antes.
-  */
-
-  setSong(
-    null
-  )
-
-
-  /*
-  =====================================
-  REINICIAMOS EN SUPABASE
-  =====================================
-  */
-
-  const {
-    error
-  } =
-    await supabase
-      .rpc(
-        'restart_one_note_game',
-        {
-          p_room_id:
-            room.id,
-
-          p_host_player_id:
-            player.player_id,
-
-          p_song_id:
-            firstSong.id
-        }
+    if (error) {
+      setLoadingFinalResults(
+        false
       )
 
 
-  if (error) {
+      setMessage(
+        error.message
+      )
+
+
+      return
+    }
+
+
+    const {
+      data: restartedRoom,
+      error: restartedRoomError
+    } =
+      await supabase
+        .from('rooms')
+        .select('*')
+        .eq(
+          'id',
+          room.id
+        )
+        .single()
+
+
+    if (
+      restartedRoomError ||
+      !restartedRoom
+    ) {
+      setLoadingFinalResults(
+        false
+      )
+
+
+      setMessage(
+        'No pude reiniciar la sala.'
+      )
+
+
+      return
+    }
+
+
+    setBuzzes([])
+    setQuery('')
+    setSelectedGuess(null)
+    setSearchResults([])
+    setAnswerCountdown(0)
+
+
+    await loadPlayers(
+      room.id
+    )
+
+
+    /*
+    Primero dejamos que React monte
+    nuevamente el juego.
+    */
+
+    setRoom(
+      restartedRoom
+    )
+
+
     setLoadingFinalResults(
       false
     )
 
-    setMessage(
-      error.message
-    )
 
-    return
+    /*
+    Luego cargamos canción para que
+    #one-note-spotify ya exista.
+    */
+
+    setTimeout(
+      async () => {
+        await loadSong(
+          firstSong.id
+        )
+
+
+        await loadBuzzes(
+          restartedRoom.id,
+          restartedRoom.current_round
+        )
+      },
+      100
+    )
   }
 
-
-  /*
-  =====================================
-  TRAEMOS NUEVA SALA
-  =====================================
-  */
-
-  const {
-    data: restartedRoom,
-    error: restartedRoomError
-  } =
-    await supabase
-      .from('rooms')
-      .select('*')
-      .eq(
-        'id',
-        room.id
-      )
-      .single()
-
-
-  if (
-    restartedRoomError ||
-    !restartedRoom
-  ) {
-    setLoadingFinalResults(
-      false
-    )
-
-    setMessage(
-      'No pude reiniciar la sala.'
-    )
-
-    return
-  }
-
-
-  /*
-  Limpiamos estado de la partida anterior.
-  */
-
-  setBuzzes([])
-  setQuery('')
-  setSelectedGuess(null)
-  setSearchResults([])
-  setAnswerCountdown(0)
-
-
-  await loadPlayers(
-    room.id
-  )
-
-
-  /*
-  =====================================
-  IMPORTANTE
-
-  Primero mostramos nuevamente
-  la pantalla del juego.
-
-  Así React vuelve a montar:
-  #one-note-spotify
-  =====================================
-  */
-
-  setRoom(
-    restartedRoom
-  )
-
-
-  setLoadingFinalResults(
-    false
-  )
-
-
-  /*
-  Esperamos un instante a que React
-  monte físicamente el nuevo div.
-
-  Después cargamos la canción.
-  */
-
-  setTimeout(
-    async () => {
-
-      await loadSong(
-        firstSong.id
-      )
-
-
-      await loadBuzzes(
-        restartedRoom.id,
-        restartedRoom.current_round
-      )
-
-    },
-    100
-  )
-}
 
   /*
   =====================================
@@ -2681,9 +2782,11 @@ async function playAgain() {
             EN UNA NOTA
           </span>
 
+
           <h1>
             Preparando resultados...
           </h1>
+
 
           <p className="muted">
             Un momento...
@@ -2714,11 +2817,6 @@ async function playAgain() {
             a.score
         )
 
-
-    /*
-    Protección adicional.
-    Nunca mostramos pantalla negra.
-    */
 
     if (
       !ranking.length
@@ -2774,9 +2872,11 @@ async function playAgain() {
                     #{index + 1}
                   </span>
 
+
                   <strong>
                     {item.player_name}
                   </strong>
+
 
                   <b>
                     {item.score}
