@@ -981,21 +981,70 @@ export default function OneNoteGamePage() {
   */
 
   useEffect(() => {
-    if (
-      !song?.spotify_id ||
-      !player?.is_host
-    ) {
-      return
-    }
+  if (
+    !song?.spotify_id ||
+    !player?.is_host ||
+    room?.status !== 'playing'
+  ) {
+    return
+  }
 
 
-    prepareSpotify(
+  let cancelled =
+    false
+
+
+  async function initializeSpotify() {
+
+    await prepareSpotify(
       song.spotify_id
     )
-  }, [
-    song?.spotify_id,
-    player?.is_host
-  ])
+
+
+    /*
+    Si React todavía no había montado
+    el contenedor, damos un segundo intento.
+    */
+
+    if (
+      !cancelled &&
+      !controllerRef.current
+    ) {
+
+      setTimeout(
+        () => {
+
+          if (
+            !cancelled &&
+            !controllerRef.current
+          ) {
+            prepareSpotify(
+              song.spotify_id
+            )
+          }
+
+        },
+        250
+      )
+
+    }
+
+  }
+
+
+  initializeSpotify()
+
+
+  return () => {
+    cancelled =
+      true
+  }
+
+}, [
+  song?.spotify_id,
+  player?.is_host,
+  room?.status
+])
 
 
   async function prepareSpotify(
@@ -2343,146 +2392,242 @@ export default function OneNoteGamePage() {
   JUGAR DE NUEVO
   =====================================
   */
-
-  async function playAgain() {
-    if (
-      !player?.is_host ||
-      loadingFinalResults
-    ) {
-      return
-    }
-
-
-    let availableSongs =
-      songs.filter(
-        item =>
-          Boolean(
-            item.spotify_id
-          )
-      )
+async function playAgain() {
+  if (
+    !player?.is_host ||
+    loadingFinalResults
+  ) {
+    return
+  }
 
 
-    /*
-    Si venimos de recargar la pantalla
-    final y songs todavía no está cargado,
-    lo cargamos aquí.
-    */
-
-    if (
-      !availableSongs.length
-    ) {
-      availableSongs =
-        await loadSongs()
-    }
-
-
-    if (
-      !availableSongs.length
-    ) {
-      setMessage(
-        'No hay canciones disponibles.'
-      )
-
-      return
-    }
-
-
-    const firstSong =
-      availableSongs[
-        Math.floor(
-          Math.random() *
-          availableSongs.length
+  let availableSongs =
+    songs.filter(
+      item =>
+        Boolean(
+          item.spotify_id
         )
-      ]
-
-
-    setLoadingFinalResults(
-      true
     )
 
-    setMessage('')
+
+  if (
+    !availableSongs.length
+  ) {
+    availableSongs =
+      await loadSongs()
+  }
 
 
-    const {
+  if (
+    !availableSongs.length
+  ) {
+    setMessage(
+      'No hay canciones disponibles.'
+    )
+
+    return
+  }
+
+
+  const firstSong =
+    availableSongs[
+      Math.floor(
+        Math.random() *
+        availableSongs.length
+      )
+    ]
+
+
+  setLoadingFinalResults(
+    true
+  )
+
+  setMessage('')
+
+
+  /*
+  =====================================
+  LIMPIAMOS COMPLETAMENTE SPOTIFY
+  =====================================
+
+  El controller anterior estaba unido
+  al iframe de la partida anterior.
+  */
+
+  clearTimeout(
+    stopTimerRef.current
+  )
+
+
+  try {
+    controllerRef.current
+      ?.destroy?.()
+  } catch (error) {
+    console.warn(
+      'No se pudo destruir el controller anterior',
       error
-    } =
-      await supabase
-        .rpc(
-          'restart_one_note_game',
-          {
-            p_room_id:
-              room.id,
-
-            p_host_player_id:
-              player.player_id,
-
-            p_song_id:
-              firstSong.id
-          }
-        )
+    )
+  }
 
 
-    if (error) {
-      setLoadingFinalResults(
-        false
+  controllerRef.current =
+    null
+
+
+  setSpotifyReady(
+    false
+  )
+
+  setIsPlaying(
+    false
+  )
+
+
+  /*
+  Evitamos que el autoplay piense
+  que esta ronda ya se reprodujo.
+  */
+
+  autoPlayKeyRef.current =
+    null
+
+
+  /*
+  Dejamos song vacío para garantizar
+  que el efecto de Spotify vuelva
+  a ejecutarse aunque salga elegida
+  la misma canción que antes.
+  */
+
+  setSong(
+    null
+  )
+
+
+  /*
+  =====================================
+  REINICIAMOS EN SUPABASE
+  =====================================
+  */
+
+  const {
+    error
+  } =
+    await supabase
+      .rpc(
+        'restart_one_note_game',
+        {
+          p_room_id:
+            room.id,
+
+          p_host_player_id:
+            player.player_id,
+
+          p_song_id:
+            firstSong.id
+        }
       )
 
 
-      setMessage(
-        error.message
-      )
+  if (error) {
+    setLoadingFinalResults(
+      false
+    )
 
-      return
-    }
+    setMessage(
+      error.message
+    )
 
-
-    autoPlayKeyRef.current =
-      null
-
-
-    setBuzzes([])
-    setQuery('')
-    setSelectedGuess(null)
-    setSearchResults([])
-    setAnswerCountdown(0)
+    return
+  }
 
 
-    /*
-    Cargamos TODO antes de salir
-    de resultados.
-    */
+  /*
+  =====================================
+  TRAEMOS NUEVA SALA
+  =====================================
+  */
 
-    const {
-      data: restartedRoom,
-      error: restartedRoomError
-    } =
-      await supabase
-        .from('rooms')
-        .select('*')
-        .eq(
-          'id',
-          room.id
-        )
-        .single()
-
-
-    await Promise.all([
-      loadPlayers(
+  const {
+    data: restartedRoom,
+    error: restartedRoomError
+  } =
+    await supabase
+      .from('rooms')
+      .select('*')
+      .eq(
+        'id',
         room.id
-      ),
-
-      loadSong(
-        firstSong.id
       )
-    ])
+      .single()
 
 
-    if (
-      !restartedRoomError &&
-      restartedRoom
-    ) {
-      setRoom(
-        restartedRoom
+  if (
+    restartedRoomError ||
+    !restartedRoom
+  ) {
+    setLoadingFinalResults(
+      false
+    )
+
+    setMessage(
+      'No pude reiniciar la sala.'
+    )
+
+    return
+  }
+
+
+  /*
+  Limpiamos estado de la partida anterior.
+  */
+
+  setBuzzes([])
+  setQuery('')
+  setSelectedGuess(null)
+  setSearchResults([])
+  setAnswerCountdown(0)
+
+
+  await loadPlayers(
+    room.id
+  )
+
+
+  /*
+  =====================================
+  IMPORTANTE
+
+  Primero mostramos nuevamente
+  la pantalla del juego.
+
+  Así React vuelve a montar:
+  #one-note-spotify
+  =====================================
+  */
+
+  setRoom(
+    restartedRoom
+  )
+
+
+  setLoadingFinalResults(
+    false
+  )
+
+
+  /*
+  Esperamos un instante a que React
+  monte físicamente el nuevo div.
+
+  Después cargamos la canción.
+  */
+
+  setTimeout(
+    async () => {
+
+      await loadSong(
+        firstSong.id
       )
 
 
@@ -2490,14 +2635,11 @@ export default function OneNoteGamePage() {
         restartedRoom.id,
         restartedRoom.current_round
       )
-    }
 
-
-    setLoadingFinalResults(
-      false
-    )
-  }
-
+    },
+    100
+  )
+}
 
   /*
   =====================================
