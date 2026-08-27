@@ -9,12 +9,8 @@ import {
 
 import {
   Users,
-  Plus,
-  LogIn,
-  Copy,
-  Play,
-  Crown,
-  Gamepad2
+  Music2,
+  ArrowLeft
 } from 'lucide-react'
 
 import {
@@ -22,18 +18,26 @@ import {
 } from '../lib/supabase'
 
 
-function generateRoomCode() {
+const ROUND_OPTIONS = [
+  5,
+  10,
+  15,
+  20
+]
+
+
+function generateCode() {
   const chars =
     'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
-  let code = ''
+  let result = ''
 
   for (
     let i = 0;
     i < 5;
     i += 1
   ) {
-    code +=
+    result +=
       chars[
         Math.floor(
           Math.random() *
@@ -42,24 +46,7 @@ function generateRoomCode() {
       ]
   }
 
-  return code
-}
-
-
-/*
-Elegimos una posición compartida.
-
-Todos los jugadores reciben
-exactamente este mismo segundo.
-*/
-function generateClipStart() {
-  const min = 10
-  const max = 55
-
-  return Math.floor(
-    Math.random() *
-    (max - min + 1)
-  ) + min
+  return result
 }
 
 
@@ -68,15 +55,37 @@ export default function RoomsPage() {
     useNavigate()
 
 
+  /*
+  =====================================
+  CREAR SALA
+  =====================================
+  */
+
   const [hostName, setHostName] =
     useState('')
+
+  const [gameMode, setGameMode] =
+    useState(null)
 
   const [totalRounds, setTotalRounds] =
     useState(5)
 
-  const [creating, setCreating] =
-    useState(false)
+  const [
+    allowRetries,
+    setAllowRetries
+  ] = useState(true)
 
+  const [
+    creatingRoom,
+    setCreatingRoom
+  ] = useState(false)
+
+
+  /*
+  =====================================
+  UNIRSE
+  =====================================
+  */
 
   const [joinName, setJoinName] =
     useState('')
@@ -84,23 +93,49 @@ export default function RoomsPage() {
   const [joinCode, setJoinCode] =
     useState('')
 
-  const [joining, setJoining] =
-    useState(false)
+  const [
+    joiningRoom,
+    setJoiningRoom
+  ] = useState(false)
 
 
-  const [room, setRoom] =
-    useState(null)
+  /*
+  =====================================
+  LOBBY
+  =====================================
+  */
 
   const [
-    currentPlayer,
-    setCurrentPlayer
+    createdRoom,
+    setCreatedRoom
   ] = useState(null)
 
-  const [players, setPlayers] =
-    useState([])
+  const [
+    lobbyPlayers,
+    setLobbyPlayers
+  ] = useState([])
+
 
   const [message, setMessage] =
     useState('')
+
+
+  /*
+  =====================================
+  ELEGIR MODO
+  =====================================
+  */
+
+  function chooseMode(mode) {
+    setGameMode(mode)
+    setMessage('')
+  }
+
+
+  function changeMode() {
+    setGameMode(null)
+    setMessage('')
+  }
 
 
   /*
@@ -110,7 +145,20 @@ export default function RoomsPage() {
   */
 
   async function createRoom() {
-    if (!hostName.trim()) {
+    const cleanName =
+      hostName.trim()
+
+
+    if (!gameMode) {
+      setMessage(
+        'Elige un modo de juego.'
+      )
+
+      return
+    }
+
+
+    if (!cleanName) {
       setMessage(
         'Escribe tu nombre.'
       )
@@ -119,25 +167,12 @@ export default function RoomsPage() {
     }
 
 
-    const rounds =
-      Math.min(
-        30,
-        Math.max(
-          1,
-          Number(totalRounds) ||
-          5
-        )
-      )
-
-
-    setCreating(true)
-
+    setCreatingRoom(true)
     setMessage('')
 
 
     try {
-      let createdRoom =
-        null
+      let roomData = null
 
 
       for (
@@ -146,7 +181,7 @@ export default function RoomsPage() {
         attempt += 1
       ) {
         const code =
-          generateRoomCode()
+          generateCode()
 
 
         const {
@@ -159,40 +194,40 @@ export default function RoomsPage() {
               code,
 
               host_name:
-                hostName
-                  .trim()
-                  .slice(
-                    0,
-                    30
-                  ),
+                cleanName,
 
               status:
                 'waiting',
 
-              max_players:
-                8,
-
               total_rounds:
-                rounds,
+                totalRounds,
 
               current_round:
                 0,
 
-              current_song_id:
+              game_mode:
+                gameMode,
+
+              allow_retries:
+                gameMode === 'one_note'
+                  ? allowRetries
+                  : true,
+
+              one_note_level:
+                0,
+
+              one_note_active_player_id:
                 null,
 
-              round_started_at:
-                null,
-
-              clip_start:
-                0
+              one_note_winner_player_id:
+                null
             })
             .select()
             .single()
 
 
         if (!error) {
-          createdRoom =
+          roomData =
             data
 
           break
@@ -208,9 +243,9 @@ export default function RoomsPage() {
       }
 
 
-      if (!createdRoom) {
+      if (!roomData) {
         throw new Error(
-          'No se pudo generar la sala.'
+          'No pude generar un código de sala.'
         )
       }
 
@@ -223,15 +258,10 @@ export default function RoomsPage() {
           .from('room_players')
           .insert({
             room_id:
-              createdRoom.id,
+              roomData.id,
 
             player_name:
-              hostName
-                .trim()
-                .slice(
-                  0,
-                  30
-                ),
+              cleanName,
 
             score:
               0,
@@ -250,7 +280,7 @@ export default function RoomsPage() {
 
       const sessionData = {
         room_id:
-          createdRoom.id,
+          roomData.id,
 
         player_id:
           playerData.id,
@@ -259,29 +289,24 @@ export default function RoomsPage() {
           playerData.player_name,
 
         is_host:
-          true
+          true,
+
+        game_mode:
+          gameMode
       }
 
 
       sessionStorage.setItem(
-        `daleplay-room-${createdRoom.code}`,
+        `daleplay-room-${roomData.code}`,
         JSON.stringify(
           sessionData
         )
       )
 
 
-      setRoom(
-        createdRoom
+      setCreatedRoom(
+        roomData
       )
-
-      setCurrentPlayer(
-        sessionData
-      )
-
-      setPlayers([
-        playerData
-      ])
 
 
     } catch (error) {
@@ -293,224 +318,96 @@ export default function RoomsPage() {
       )
 
     } finally {
-      setCreating(false)
+      setCreatingRoom(false)
     }
   }
 
 
   /*
   =====================================
-  UNIRSE
+  LOBBY REALTIME
   =====================================
   */
 
-  async function joinRoom() {
-    if (!joinName.trim()) {
-      setMessage(
-        'Escribe tu nombre.'
-      )
-
-      return
-    }
-
-
-    const normalizedCode =
-      joinCode
-        .trim()
-        .toUpperCase()
-
-
+  useEffect(() => {
     if (
-      normalizedCode.length <
-      4
+      !createdRoom?.id
     ) {
-      setMessage(
-        'Escribe el código de la sala.'
-      )
-
       return
     }
 
 
-    setJoining(true)
-
-    setMessage('')
-
-
-    try {
-      const {
-        data: foundRoom,
-        error: roomError
-      } =
-        await supabase
-          .from('rooms')
-          .select('*')
-          .eq(
-            'code',
-            normalizedCode
-          )
-          .single()
+    loadLobbyPlayers(
+      createdRoom.id
+    )
 
 
-      if (
-        roomError ||
-        !foundRoom
-      ) {
-        throw new Error(
-          'No encontré esa sala.'
-        )
-      }
-
-
-      if (
-        foundRoom.status !==
-        'waiting'
-      ) {
-        throw new Error(
-          'La partida ya comenzó.'
-        )
-      }
-
-
-      const {
-        data: existingPlayers,
-        error: playersError
-      } =
-        await supabase
-          .from('room_players')
-          .select('*')
-          .eq(
-            'room_id',
-            foundRoom.id
-          )
-
-
-      if (playersError) {
-        throw playersError
-      }
-
-
-      if (
-        existingPlayers.length >=
-        foundRoom.max_players
-      ) {
-        throw new Error(
-          'La sala está llena.'
-        )
-      }
-
-
-      const duplicatedName =
-        existingPlayers.some(
-          item =>
-            item
-              .player_name
-              .trim()
-              .toLowerCase() ===
-            joinName
-              .trim()
-              .toLowerCase()
+    const channel =
+      supabase
+        .channel(
+          `lobby-${createdRoom.id}`
         )
 
-
-      if (duplicatedName) {
-        throw new Error(
-          'Ya hay un jugador con ese nombre.'
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'room_players',
+            filter:
+              `room_id=eq.${createdRoom.id}`
+          },
+          () => {
+            loadLobbyPlayers(
+              createdRoom.id
+            )
+          }
         )
-      }
+
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'rooms',
+            filter:
+              `id=eq.${createdRoom.id}`
+          },
+          payload => {
+            const updated =
+              payload.new
 
 
-      const {
-        data: playerData,
-        error: playerError
-      } =
-        await supabase
-          .from('room_players')
-          .insert({
-            room_id:
-              foundRoom.id,
-
-            player_name:
-              joinName
-                .trim()
-                .slice(
-                  0,
-                  30
-                ),
-
-            score:
-              0,
-
-            is_host:
-              false
-          })
-          .select()
-          .single()
+            setCreatedRoom(
+              updated
+            )
 
 
-      if (playerError) {
-        throw playerError
-      }
-
-
-      const sessionData = {
-        room_id:
-          foundRoom.id,
-
-        player_id:
-          playerData.id,
-
-        player_name:
-          playerData.player_name,
-
-        is_host:
-          false
-      }
-
-
-      sessionStorage.setItem(
-        `daleplay-room-${foundRoom.code}`,
-        JSON.stringify(
-          sessionData
+            if (
+              updated.status ===
+              'playing'
+            ) {
+              goToGame(
+                updated
+              )
+            }
+          }
         )
+
+        .subscribe()
+
+
+    return () => {
+      supabase.removeChannel(
+        channel
       )
-
-
-      setRoom(
-        foundRoom
-      )
-
-      setCurrentPlayer(
-        sessionData
-      )
-
-
-      await loadPlayers(
-        foundRoom.id
-      )
-
-
-    } catch (error) {
-      console.error(error)
-
-      setMessage(
-        error.message ||
-        'No se pudo entrar a la sala.'
-      )
-
-    } finally {
-      setJoining(false)
     }
-  }
+  }, [
+    createdRoom?.id
+  ])
 
 
-  /*
-  =====================================
-  JUGADORES
-  =====================================
-  */
-
-  async function loadPlayers(
+  async function loadLobbyPlayers(
     roomId
   ) {
     const {
@@ -539,7 +436,7 @@ export default function RoomsPage() {
     }
 
 
-    setPlayers(
+    setLobbyPlayers(
       data || []
     )
   }
@@ -547,84 +444,142 @@ export default function RoomsPage() {
 
   /*
   =====================================
-  REALTIME
+  UNIRSE
   =====================================
   */
 
-  useEffect(() => {
-    if (!room?.id) {
+  async function joinRoom() {
+    const cleanName =
+      joinName.trim()
+
+    const cleanCode =
+      joinCode
+        .trim()
+        .toUpperCase()
+
+
+    if (
+      !cleanName ||
+      !cleanCode
+    ) {
+      setMessage(
+        'Escribe tu nombre y el código.'
+      )
+
       return
     }
 
 
-    const roomId =
-      room.id
+    setJoiningRoom(true)
+    setMessage('')
 
 
-    const channel =
-      supabase
-        .channel(
-          `daleplay-lobby-${roomId}`
+    try {
+      const {
+        data: roomData,
+        error: roomError
+      } =
+        await supabase
+          .from('rooms')
+          .select('*')
+          .eq(
+            'code',
+            cleanCode
+          )
+          .single()
+
+
+      if (
+        roomError ||
+        !roomData
+      ) {
+        throw new Error(
+          'No encontré esa sala.'
         )
+      }
 
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'room_players',
-            filter:
-              `room_id=eq.${roomId}`
-          },
-          () => {
-            loadPlayers(
-              roomId
-            )
-          }
+
+      if (
+        roomData.status !==
+        'waiting'
+      ) {
+        throw new Error(
+          'La partida ya comenzó.'
         )
-
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'rooms',
-            filter:
-              `id=eq.${roomId}`
-          },
-          payload => {
-            const updatedRoom =
-              payload.new
+      }
 
 
-            setRoom(
-              updatedRoom
-            )
+      const {
+        data: playerData,
+        error: playerError
+      } =
+        await supabase
+          .from('room_players')
+          .insert({
+            room_id:
+              roomData.id,
+
+            player_name:
+              cleanName,
+
+            score:
+              0,
+
+            is_host:
+              false
+          })
+          .select()
+          .single()
 
 
-            if (
-              updatedRoom.status ===
-              'playing'
-            ) {
-              navigate(
-                `/salas/${updatedRoom.code}/juego`
-              )
-            }
-          }
+      if (playerError) {
+        throw playerError
+      }
+
+
+      const sessionData = {
+        room_id:
+          roomData.id,
+
+        player_id:
+          playerData.id,
+
+        player_name:
+          playerData.player_name,
+
+        is_host:
+          false,
+
+        game_mode:
+          roomData.game_mode
+      }
+
+
+      sessionStorage.setItem(
+        `daleplay-room-${roomData.code}`,
+        JSON.stringify(
+          sessionData
         )
-
-        .subscribe()
-
-
-    return () => {
-      supabase.removeChannel(
-        channel
       )
+
+
+      setCreatedRoom(
+        roomData
+      )
+
+
+    } catch (error) {
+      console.error(error)
+
+      setMessage(
+        error.message ||
+        'No se pudo entrar.'
+      )
+
+    } finally {
+      setJoiningRoom(false)
     }
-  }, [
-    room?.id,
-    navigate
-  ])
+  }
 
 
   /*
@@ -634,16 +589,13 @@ export default function RoomsPage() {
   */
 
   async function startGame() {
-    if (
-      !currentPlayer?.is_host ||
-      !room
-    ) {
+    if (!createdRoom) {
       return
     }
 
 
     if (
-      players.length < 2
+      lobbyPlayers.length < 2
     ) {
       setMessage(
         'Necesitas al menos 2 jugadores.'
@@ -653,12 +605,9 @@ export default function RoomsPage() {
     }
 
 
-    setMessage('')
-
-
     const {
-      data: availableSongs,
-      error: songError
+      data: songData,
+      error: songsError
     } =
       await supabase
         .from('songs')
@@ -669,17 +618,28 @@ export default function RoomsPage() {
           'active',
           true
         )
-        .not(
-          'spotify_id',
-          'is',
-          null
+
+
+    if (songsError) {
+      setMessage(
+        songsError.message
+      )
+
+      return
+    }
+
+
+    const available =
+      (songData || [])
+        .filter(
+          item =>
+            Boolean(
+              item.spotify_id
+            )
         )
 
 
-    if (
-      songError ||
-      !availableSongs?.length
-    ) {
+    if (!available.length) {
       setMessage(
         'No hay canciones disponibles.'
       )
@@ -689,29 +649,12 @@ export default function RoomsPage() {
 
 
     const firstSong =
-      availableSongs[
+      available[
         Math.floor(
           Math.random() *
-          availableSongs.length
+          available.length
         )
       ]
-
-
-    /*
-    ESTE valor queda guardado
-    para TODOS los jugadores.
-    */
-
-    const clipStart =
-      generateClipStart()
-
-
-    const startAt =
-      new Date(
-        Date.now() +
-        3000
-      )
-        .toISOString()
 
 
     const {
@@ -729,15 +672,22 @@ export default function RoomsPage() {
           current_song_id:
             firstSong.id,
 
-          round_started_at:
-            startAt,
+          one_note_level:
+            0,
 
-          clip_start:
-            clipStart
+          one_note_active_player_id:
+            null,
+
+          one_note_winner_player_id:
+            null,
+
+          round_started_at:
+            new Date()
+              .toISOString()
         })
         .eq(
           'id',
-          room.id
+          createdRoom.id
         )
 
 
@@ -749,21 +699,22 @@ export default function RoomsPage() {
   }
 
 
-  async function copyCode() {
-    try {
-      await navigator.clipboard.writeText(
-        room.code
+  function goToGame(roomData) {
+    if (
+      roomData.game_mode ===
+      'one_note'
+    ) {
+      navigate(
+        `/salas/${roomData.code}/en-una-nota`
       )
 
-      setMessage(
-        'Código copiado.'
-      )
-
-    } catch {
-      setMessage(
-        `Código: ${room.code}`
-      )
+      return
     }
+
+
+    navigate(
+      `/salas/${roomData.code}/juego`
+    )
   }
 
 
@@ -774,86 +725,91 @@ export default function RoomsPage() {
   */
 
   if (
-    room &&
-    currentPlayer
+    createdRoom
   ) {
+    const session =
+      sessionStorage.getItem(
+        `daleplay-room-${createdRoom.code}`
+      )
+
+
+    let currentPlayer =
+      null
+
+
+    try {
+      currentPlayer =
+        JSON.parse(
+          session
+        )
+    } catch {
+      currentPlayer =
+        null
+    }
+
+
     return (
       <section className="rooms-wrap">
 
         <div className="room-lobby-card">
 
           <span className="room-eyebrow">
-            Sala privada
+
+            {createdRoom.game_mode ===
+            'one_note'
+              ? 'EN UNA NOTA'
+              : 'MODO CLÁSICO'}
+
           </span>
 
+
           <h1>
-            Esperando jugadores
+            Sala {createdRoom.code}
           </h1>
 
 
+          <p className="muted">
+            Comparte este código con tus amigos.
+          </p>
+
+
           <div className="room-code-box">
-
-            <span>
-              CÓDIGO
-            </span>
-
-            <strong>
-              {room.code}
-            </strong>
-
-            <button
-              type="button"
-              onClick={copyCode}
-            >
-              <Copy size={18} />
-              Copiar
-            </button>
-
+            {createdRoom.code}
           </div>
 
 
           <div className="room-settings-summary">
 
             <span>
-              <Gamepad2 size={18} />
-
-              {room.total_rounds}
-              {' '}
-              {room.total_rounds === 1
-                ? 'ronda'
-                : 'rondas'}
+              {createdRoom.total_rounds} rondas
             </span>
 
-            <span>
-              <Users size={18} />
 
-              {players.length}
-              /
-              {room.max_players}
-            </span>
+            {createdRoom.game_mode ===
+              'one_note' && (
+
+              <span>
+
+                {createdRoom.allow_retries
+                  ? 'Reintentos activados'
+                  : 'Sin reintentos'}
+
+              </span>
+
+            )}
 
           </div>
 
 
           <div className="room-player-list">
 
-            {players.map(
+            {lobbyPlayers.map(
               item => (
 
                 <div
-                  className="room-player-row"
                   key={item.id}
+                  className="room-player-row"
                 >
-
-                  <span className="room-player-avatar">
-
-                    {item
-                      .player_name
-                      .charAt(0)
-                      .toUpperCase()}
-
-                  </span>
-
 
                   <strong>
                     {item.player_name}
@@ -861,15 +817,9 @@ export default function RoomsPage() {
 
 
                   {item.is_host && (
-
-                    <span className="room-host-badge">
-
-                      <Crown size={15} />
-
+                    <span>
                       Host
-
                     </span>
-
                   )}
 
                 </div>
@@ -880,38 +830,34 @@ export default function RoomsPage() {
           </div>
 
 
-          {message && (
-
-            <div className="message">
-              {message}
-            </div>
-
-          )}
-
-
-          {currentPlayer.is_host ? (
+          {currentPlayer?.is_host ? (
 
             <button
-              className="primary room-start-btn"
-              onClick={startGame}
+              className="primary"
+              onClick={
+                startGame
+              }
               disabled={
-                players.length < 2
+                lobbyPlayers.length < 2
               }
             >
-
-              <Play size={20} />
-
-              {players.length < 2
-                ? 'Esperando otro jugador...'
-                : 'Comenzar partida'}
-
+              Iniciar partida
             </button>
 
           ) : (
 
             <p className="muted">
-              El host iniciará la partida.
+              Esperando al host...
             </p>
+
+          )}
+
+
+          {message && (
+
+            <div className="message">
+              {message}
+            </div>
 
           )}
 
@@ -924,7 +870,7 @@ export default function RoomsPage() {
 
   /*
   =====================================
-  CREAR / ENTRAR
+  CREAR / UNIRSE
   =====================================
   */
 
@@ -933,122 +879,296 @@ export default function RoomsPage() {
 
       <div className="rooms-heading">
 
-        <span className="room-eyebrow">
-          MULTIJUGADOR
-        </span>
-
         <h1>
-          Juega con tus amigos
+          Juega con amigos
         </h1>
 
         <p>
-          Crea una sala privada o entra con un código.
+          Elige cómo quieren jugar.
         </p>
 
       </div>
 
 
-      <div className="rooms-grid">
+      {/*
+      =====================================
+      PASO 1: ELEGIR MODO
+      =====================================
+      */}
+
+      <div className="room-mode-selector">
+
+        <button
+          type="button"
+          className={
+            `room-mode-card ${
+              gameMode === 'classic'
+                ? 'active'
+                : ''
+            }`
+          }
+          onClick={
+            () =>
+              chooseMode(
+                'classic'
+              )
+          }
+        >
+
+          <Users size={26} />
+
+          <strong>
+            Modo clásico
+          </strong>
+
+          <span>
+            Cada quien escucha y responde desde su dispositivo.
+          </span>
+
+        </button>
 
 
-        <div className="room-create-card">
+        <button
+          type="button"
+          className={
+            `room-mode-card ${
+              gameMode === 'one_note'
+                ? 'active'
+                : ''
+            }`
+          }
+          onClick={
+            () =>
+              chooseMode(
+                'one_note'
+              )
+          }
+        >
 
-          <div className="room-card-icon">
-            <Plus />
+          <Music2 size={26} />
+
+          <strong>
+            En una nota
+          </strong>
+
+          <span>
+            Una sola pantalla reproduce. Todos compiten por responder.
+          </span>
+
+        </button>
+
+      </div>
+
+
+      {/*
+      =====================================
+      PASO 2: PERSONALIZAR
+      =====================================
+      */}
+
+      {gameMode && (
+
+        <div className="room-customize-section">
+
+
+          <div className="room-customize-heading">
+
+            <div>
+
+              <span>
+                {gameMode === 'one_note'
+                  ? 'EN UNA NOTA'
+                  : 'MODO CLÁSICO'}
+              </span>
+
+              <h2>
+                Personaliza tu sala
+              </h2>
+
+            </div>
+
+
+            <button
+              type="button"
+              className="room-change-mode"
+              onClick={
+                changeMode
+              }
+            >
+
+              <ArrowLeft size={16} />
+
+              Cambiar modo
+
+            </button>
+
           </div>
 
-          <h2>
-            Crear sala
-          </h2>
+
+          <div className="room-create-card room-create-custom">
+
+            <label className="room-field">
+
+              <span>
+                Tu nombre
+              </span>
 
 
-          <label>
-            Tu nombre
-          </label>
+              <input
+                value={hostName}
+                placeholder="Escribe tu nombre"
+                onChange={
+                  event =>
+                    setHostName(
+                      event.target.value
+                    )
+                }
+              />
 
-          <input
-            value={hostName}
-            maxLength={30}
-            placeholder="Ej. Luis"
-            onChange={
-              event =>
-                setHostName(
-                  event.target.value
-                )
-            }
-          />
+            </label>
 
 
-          <label>
-            Cantidad de rondas
-          </label>
+            <div className="room-field">
+
+              <span>
+                Cantidad de rondas
+              </span>
 
 
-          <div className="room-round-options">
+              <div className="room-round-options">
 
-            {[5, 10, 15, 20].map(
-              amount => (
+                {ROUND_OPTIONS.map(
+                  option => (
+
+                    <button
+                      key={option}
+                      type="button"
+                      className={
+                        totalRounds ===
+                        option
+                          ? 'active'
+                          : ''
+                      }
+                      onClick={
+                        () =>
+                          setTotalRounds(
+                            option
+                          )
+                      }
+                    >
+
+                      {option}
+
+                    </button>
+
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+
+            {gameMode ===
+              'one_note' && (
+
+              <div className="room-retry-setting">
+
+                <div>
+
+                  <strong>
+                    Permitir reintentos
+                  </strong>
+
+
+                  <span>
+
+                    {allowRetries
+                      ? 'Pueden volver a intentar en la siguiente escucha.'
+                      : 'Si fallan, quedan fuera de esa canción.'}
+
+                  </span>
+
+                </div>
+
 
                 <button
-                  key={amount}
                   type="button"
                   className={
-                    totalRounds === amount
-                      ? 'active'
-                      : ''
+                    `room-switch ${
+                      allowRetries
+                        ? 'on'
+                        : ''
+                    }`
                   }
                   onClick={
                     () =>
-                      setTotalRounds(
-                        amount
+                      setAllowRetries(
+                        current =>
+                          !current
                       )
                   }
+                  aria-label="Permitir reintentos"
                 >
-                  {amount}
+
+                  <span />
+
                 </button>
 
-              )
+              </div>
+
             )}
+
+
+            <button
+              className="primary room-create-main-btn"
+              onClick={
+                createRoom
+              }
+              disabled={
+                creatingRoom
+              }
+            >
+
+              {creatingRoom
+                ? 'Creando...'
+                : 'Crear sala'}
+
+            </button>
 
           </div>
 
+        </div>
 
-          <button
-            className="primary"
-            onClick={createRoom}
-            disabled={creating}
-          >
+      )}
 
-            <Plus size={19} />
 
-            {creating
-              ? 'Creando...'
-              : 'Crear sala'}
+      {/*
+      =====================================
+      ENTRAR A SALA
+      =====================================
+      */}
 
-          </button>
+      <div className="room-join-section">
+
+        <div className="room-join-heading">
+
+          <span>
+            ¿Ya tienes código?
+          </span>
+
+          <h2>
+            Entrar a una sala
+          </h2>
 
         </div>
 
 
-        <div className="room-join-card">
-
-          <div className="room-card-icon">
-            <LogIn />
-          </div>
-
-          <h2>
-            Unirse a una sala
-          </h2>
-
-
-          <label>
-            Tu nombre
-          </label>
+        <div className="room-join-card room-join-inline">
 
           <input
             value={joinName}
-            maxLength={30}
-            placeholder="Ej. Ramón"
+            placeholder="Tu nombre"
             onChange={
               event =>
                 setJoinName(
@@ -1058,20 +1178,14 @@ export default function RoomsPage() {
           />
 
 
-          <label>
-            Código
-          </label>
-
           <input
             value={joinCode}
+            placeholder="Código"
             maxLength={5}
-            placeholder="ABCDE"
             onChange={
               event =>
                 setJoinCode(
-                  event
-                    .target
-                    .value
+                  event.target.value
                     .toUpperCase()
                 )
             }
@@ -1079,16 +1193,18 @@ export default function RoomsPage() {
 
 
           <button
-            className="primary"
-            onClick={joinRoom}
-            disabled={joining}
+            className="secondary"
+            onClick={
+              joinRoom
+            }
+            disabled={
+              joiningRoom
+            }
           >
 
-            <LogIn size={19} />
-
-            {joining
+            {joiningRoom
               ? 'Entrando...'
-              : 'Entrar a sala'}
+              : 'Entrar'}
 
           </button>
 

@@ -9,46 +9,29 @@ import {
   Users
 } from 'lucide-react'
 
-import { Analytics } from '@vercel/analytics/react'
-
-import GamePage
-  from './pages/GamePage'
-
-import AdminPage
-  from './pages/AdminPage'
-
-import RoomsPage
-  from './pages/RoomsPage'
-
-import RoomGamePage
-  from './pages/RoomGamePage'
-
-import SpotifyTestPage
-  from './pages/SpotifyTestPage'
+import GamePage from './pages/GamePage'
+import AdminPage from './pages/AdminPage'
+import RoomsPage from './pages/RoomsPage'
+import RoomGamePage from './pages/RoomGamePage'
+import OneNoteGamePage from './pages/OneNoteGamePage'
+import SpotifyTestPage from './pages/SpotifyTestPage'
 
 
 export default function App() {
-
   return (
-
     <div className="app-shell">
 
-
       <header className="topbar">
-
 
         <NavLink
           to="/"
           className="brand"
         >
-
           DALE PLAY
-
         </NavLink>
 
 
         <nav className="main-nav">
-
 
           <NavLink
             to="/"
@@ -61,9 +44,7 @@ export default function App() {
             }
           >
 
-            <Gamepad2
-              size={18}
-            />
+            <Gamepad2 size={18} />
 
             Jugar
 
@@ -80,29 +61,23 @@ export default function App() {
             }
           >
 
-            <Users
-              size={18}
-            />
+            <Users size={18} />
 
             Sala privada
 
           </NavLink>
-
 
         </nav>
 
 
         <div className="topbar-spacer" />
 
-
       </header>
 
 
       <main>
 
-
         <Routes>
-
 
           <Route
             path="/"
@@ -129,6 +104,14 @@ export default function App() {
 
 
           <Route
+            path="/salas/:code/en-una-nota"
+            element={
+              <OneNoteGamePage />
+            }
+          />
+
+
+          <Route
             path="/admin"
             element={
               <AdminPage />
@@ -143,15 +126,9 @@ export default function App() {
             }
           />
 
-
         </Routes>
 
-
       </main>
-
-
-      <Analytics />
-
 
     </div>
   )
