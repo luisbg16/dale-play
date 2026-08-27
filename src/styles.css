@@ -6023,3 +6023,154 @@ strong {
     border-radius: 20px;
   }
 }
+/* =====================================
+   RESPONDER - PANEL ENFOCADO
+   ===================================== */
+
+.one-note-answer {
+  position: fixed;
+
+  left: 50%;
+  bottom: 18px;
+
+  transform:
+    translateX(-50%);
+
+  width:
+    min(
+      540px,
+      calc(100% - 24px)
+    );
+
+  max-height:
+    calc(100vh - 110px);
+
+  overflow-y: auto;
+
+  margin: 0;
+
+  padding: 22px;
+
+  border-radius: 24px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.08);
+
+  background:
+    #141416;
+
+  box-shadow:
+    0 24px 70px
+    rgba(0,0,0,.55);
+
+  z-index: 210;
+}
+
+
+/* fondo oscuro real detrás */
+
+.one-note-game:has(.one-note-answer)::before {
+  content: '';
+
+  position: fixed;
+  inset: 0;
+
+  z-index: 190;
+
+  background:
+    rgba(8,8,10,.88);
+
+  backdrop-filter:
+    blur(10px);
+
+  -webkit-backdrop-filter:
+    blur(10px);
+}
+
+
+/* el panel queda encima del overlay */
+
+.one-note-game:has(.one-note-answer)
+.one-note-answer {
+  position: fixed;
+  z-index: 210;
+}
+
+
+/* ocultamos visualmente el resto */
+
+.one-note-game:has(.one-note-answer)
+.one-note-progress,
+
+.one-note-game:has(.one-note-answer)
+.one-note-host,
+
+.one-note-game:has(.one-note-answer)
+.one-note-player-action,
+
+.one-note-game:has(.one-note-answer)
+.one-note-queue {
+  opacity: 0;
+}
+
+
+/* buscador sólido */
+
+.one-note-search {
+  background:
+    #1c1c1f;
+
+  border:
+    1px solid
+    rgba(255,255,255,.1);
+}
+
+
+/* resultados sólidos */
+
+.spotify-game-results {
+  background:
+    #18181b !important;
+
+  border:
+    1px solid
+    rgba(255,255,255,.08);
+
+  box-shadow:
+    0 18px 44px
+    rgba(0,0,0,.5);
+}
+
+
+/* =====================================
+   MOBILE
+   ===================================== */
+
+@media (max-width: 700px) {
+
+  .one-note-answer {
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    transform: none;
+
+    width: 100%;
+
+    max-height:
+      82vh;
+
+    padding:
+      20px
+      18px
+      26px;
+
+    border-radius:
+      24px
+      24px
+      0
+      0;
+  }
+
+}
