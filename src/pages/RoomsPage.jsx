@@ -10,7 +10,10 @@ import {
 import {
   Users,
   Music2,
-  ArrowLeft
+  ArrowLeft,
+  Disc3,
+  CircleHelp,
+  X
 } from 'lucide-react'
 
 import {
@@ -26,9 +29,20 @@ const ROUND_OPTIONS = [
 ]
 
 const ANSWER_TIME_OPTIONS = [
-  5,
   10,
-  15
+  15,
+  20,
+  30
+]
+
+const GENRE_OPTIONS = [
+  'Urbano / Reggaetón',
+  'Rock / Alternativo',
+  'Pop',
+  'Salsa / Tropical',
+  'Balada / Romántica',
+  'Regional / Ranchera',
+  'Bachata'
 ]
 
 
@@ -81,6 +95,16 @@ export default function RoomsPage() {
   ] = useState(10)
 
   const [
+    selectedGenres,
+    setSelectedGenres
+  ] = useState([])
+
+  const [
+    genrePanelOpen,
+    setGenrePanelOpen
+  ] = useState(false)
+
+  const [
     creatingRoom,
     setCreatingRoom
   ] = useState(false)
@@ -112,6 +136,126 @@ export default function RoomsPage() {
   const [message, setMessage] =
     useState('')
 
+  const [
+    helpMode,
+    setHelpMode
+  ] = useState(null)
+
+
+  function renderHowToModal() {
+    if (!helpMode) {
+      return null
+    }
+
+
+    const isOneNote =
+      helpMode === 'one_note'
+
+
+    return (
+
+      <div
+        onClick={
+          () =>
+            setHelpMode(null)
+        }
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 700,
+          background: 'rgba(0,0,0,.72)',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 20
+        }}
+      >
+
+        <div
+          onClick={
+            event =>
+              event.stopPropagation()
+          }
+          style={{
+            width: 'min(440px, 100%)',
+            background: '#151517',
+            border: '1px solid rgba(255,255,255,.1)',
+            borderRadius: 22,
+            padding: 24,
+            boxShadow: '0 24px 70px rgba(0,0,0,.55)'
+          }}
+        >
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 16
+            }}
+          >
+
+            <div>
+
+              <small
+                style={{
+                  display: 'block',
+                  opacity: 0.48,
+                  marginBottom: 4
+                }}
+              >
+                {isOneNote
+                  ? 'EN UNA NOTA'
+                  : 'MODO CLÁSICO'}
+              </small>
+
+              <h2 style={{ margin: 0 }}>
+                Cómo jugar
+              </h2>
+
+            </div>
+
+
+            <button
+              type="button"
+              onClick={
+                () =>
+                  setHelpMode(null)
+              }
+              aria-label="Cerrar"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                opacity: 0.65,
+                padding: 4,
+                display: 'inline-flex',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+          </div>
+
+
+          <p
+            className="muted"
+            style={{
+              lineHeight: 1.65,
+              marginBottom: 0
+            }}
+          >
+            {isOneNote
+              ? 'Una sola pantalla reproduce la canción. Todos pueden tocar Adivinar para entrar en la fila. Cuando llegue tu turno, busca y responde antes de que termine el tiempo. Cada acierto vale 1 punto.'
+              : 'Cada jugador escucha desde su propio dispositivo. Empieza con un fragmento corto y trata de adivinar la canción. Si necesitas más pista, toca Escuchar más: se desbloquea el siguiente fragmento y se reproduce automáticamente. Mientras antes aciertes, más puntos ganas.'}
+          </p>
+
+        </div>
+
+      </div>
+    )
+  }
+
 
   function chooseMode(mode) {
     setGameMode(
@@ -127,6 +271,30 @@ export default function RoomsPage() {
 
   function changeMode() {
     setGameMode(null)
+    setMessage('')
+  }
+
+
+  function toggleGenre(genre) {
+    setSelectedGenres(
+      current =>
+        current.includes(genre)
+          ? current.filter(
+              item =>
+                item !== genre
+            )
+          : [
+              ...current,
+              genre
+            ]
+    )
+
+    setMessage('')
+  }
+
+
+  function selectAllGenres() {
+    setSelectedGenres([])
     setMessage('')
   }
 
@@ -194,6 +362,11 @@ export default function RoomsPage() {
 
               game_mode:
                 gameMode,
+
+              genres:
+                selectedGenres.length
+                  ? selectedGenres
+                  : null,
 
               allow_retries:
                 gameMode === 'one_note'
@@ -592,7 +765,7 @@ export default function RoomsPage() {
       await supabase
         .from('songs')
         .select(
-          'id, spotify_id'
+          'id, spotify_id, genre'
         )
         .eq(
           'active',
@@ -609,12 +782,26 @@ export default function RoomsPage() {
     }
 
 
+    const allowedGenres =
+      Array.isArray(
+        createdRoom.genres
+      )
+        ? createdRoom.genres
+        : []
+
+
     const available =
       (songData || [])
         .filter(
           item =>
             Boolean(
               item.spotify_id
+            ) &&
+            (
+              !allowedGenres.length ||
+              allowedGenres.includes(
+                item.genre
+              )
             )
         )
 
@@ -731,16 +918,57 @@ export default function RoomsPage() {
     return (
       <section className="rooms-wrap">
 
+        {renderHowToModal()}
+
         <div className="room-lobby-card">
 
-          <span className="room-eyebrow">
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 7
+            }}
+          >
 
-            {createdRoom.game_mode ===
-            'one_note'
-              ? 'EN UNA NOTA'
-              : 'MODO CLÁSICO'}
+            <span className="room-eyebrow">
 
-          </span>
+              {createdRoom.game_mode ===
+              'one_note'
+                ? 'EN UNA NOTA'
+                : 'MODO CLÁSICO'}
+
+            </span>
+
+
+            <button
+              type="button"
+              onClick={
+                () =>
+                  setHelpMode(
+                    createdRoom.game_mode
+                  )
+              }
+              aria-label="Cómo jugar"
+              title="Cómo jugar"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                border: '1px solid rgba(255,255,255,.12)',
+                background: 'rgba(255,255,255,.04)',
+                color: 'inherit',
+                opacity: 0.78,
+                padding: 0,
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <CircleHelp size={16} />
+            </button>
+
+          </div>
 
 
           <h1>
@@ -762,6 +990,14 @@ export default function RoomsPage() {
 
             <span>
               {createdRoom.total_rounds} rondas
+            </span>
+
+
+            <span>
+              {Array.isArray(createdRoom.genres) &&
+              createdRoom.genres.length
+                ? createdRoom.genres.join(' · ')
+                : 'Todos los géneros'}
             </span>
 
 
@@ -853,6 +1089,8 @@ export default function RoomsPage() {
   return (
     <section className="rooms-wrap">
 
+      {renderHowToModal()}
+
       <div className="rooms-heading">
 
         <h1>
@@ -895,6 +1133,43 @@ export default function RoomsPage() {
             Cada quien escucha y responde desde su dispositivo.
           </span>
 
+
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label="Cómo jugar modo clásico"
+            title="Cómo jugar"
+            onClick={
+              event => {
+                event.stopPropagation()
+                setHelpMode('classic')
+              }
+            }
+            onKeyDown={
+              event => {
+                if (
+                  event.key === 'Enter' ||
+                  event.key === ' '
+                ) {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setHelpMode('classic')
+                }
+              }
+            }
+            style={{
+              marginTop: 8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              opacity: 0.62,
+              fontSize: '.78rem'
+            }}
+          >
+            <CircleHelp size={15} />
+            Cómo jugar
+          </span>
+
         </button>
 
 
@@ -923,6 +1198,43 @@ export default function RoomsPage() {
 
           <span>
             Una sola pantalla reproduce. Todos compiten por responder.
+          </span>
+
+
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label="Cómo jugar En una nota"
+            title="Cómo jugar"
+            onClick={
+              event => {
+                event.stopPropagation()
+                setHelpMode('one_note')
+              }
+            }
+            onKeyDown={
+              event => {
+                if (
+                  event.key === 'Enter' ||
+                  event.key === ' '
+                ) {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setHelpMode('one_note')
+                }
+              }
+            }
+            style={{
+              marginTop: 8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              opacity: 0.62,
+              fontSize: '.78rem'
+            }}
+          >
+            <CircleHelp size={15} />
+            Cómo jugar
           </span>
 
         </button>
@@ -1029,6 +1341,92 @@ export default function RoomsPage() {
                 )}
 
               </div>
+
+            </div>
+
+
+
+            <div className="room-field">
+
+              <span>
+                Géneros
+              </span>
+
+
+              <button
+                type="button"
+                className="room-change-mode"
+                onClick={
+                  () =>
+                    setGenrePanelOpen(
+                      current =>
+                        !current
+                    )
+                }
+              >
+
+                <Disc3 size={17} />
+
+                {selectedGenres.length
+                  ? `${selectedGenres.length} seleccionados`
+                  : 'Todos los géneros'}
+
+              </button>
+
+
+              {genrePanelOpen && (
+
+                <div className="room-round-options">
+
+                  <button
+                    type="button"
+                    className={
+                      selectedGenres.length === 0
+                        ? 'active'
+                        : ''
+                    }
+                    onClick={
+                      selectAllGenres
+                    }
+                  >
+                    Todos
+                  </button>
+
+
+                  {GENRE_OPTIONS.map(
+                    genre => (
+
+                      <button
+                        key={genre}
+                        type="button"
+                        className={
+                          selectedGenres.includes(
+                            genre
+                          )
+                            ? 'active'
+                            : ''
+                        }
+                        onClick={
+                          () =>
+                            toggleGenre(
+                              genre
+                            )
+                        }
+                      >
+                        {genre}
+                      </button>
+
+                    )
+                  )}
+
+                </div>
+
+              )}
+
+
+              <small className="muted">
+                Puedes elegir uno o varios géneros.
+              </small>
 
             </div>
 

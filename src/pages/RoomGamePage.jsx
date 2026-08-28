@@ -13,12 +13,14 @@ import {
   Play,
   Pause,
   SkipForward,
+  Volume2,
   Trophy,
   ArrowRight,
   X,
   CheckCircle2,
   RotateCcw,
-  LogOut
+  LogOut,
+  CircleHelp
 } from 'lucide-react'
 
 import {
@@ -39,31 +41,31 @@ const LEVELS = [
   {
     id: 'imposible',
     label: 'Imposible',
-    duration: 1,
+    duration: 2,
     points: 500
   },
   {
     id: 'experto',
     label: 'Experto',
-    duration: 2,
+    duration: 4,
     points: 400
   },
   {
     id: 'dificil',
     label: 'Difícil',
-    duration: 5,
+    duration: 8,
     points: 300
   },
   {
     id: 'media',
     label: 'Media',
-    duration: 10,
+    duration: 15,
     points: 200
   },
   {
     id: 'facil',
     label: 'Fácil',
-    duration: 15,
+    duration: 25,
     points: 100
   }
 ]
@@ -446,6 +448,11 @@ export default function RoomGamePage() {
 
   const [message, setMessage] =
     useState('')
+
+  const [
+    showHowTo,
+    setShowHowTo
+  ] = useState(false)
 
 
   const currentLevel =
@@ -863,7 +870,9 @@ export default function RoomGamePage() {
         roomData.id
       ),
 
-      loadSongs(),
+      loadSongs(
+        roomData.genres
+      ),
 
       loadAnswers(
         roomData.id,
@@ -889,7 +898,9 @@ export default function RoomGamePage() {
   =====================================
   */
 
-  async function loadSongs() {
+  async function loadSongs(
+    allowedGenres = null
+  ) {
     const {
       data,
       error
@@ -897,7 +908,7 @@ export default function RoomGamePage() {
       await supabase
         .from('songs')
         .select(
-          'id, title, artist, spotify_id, album_image_url'
+          'id, title, artist, spotify_id, album_image_url, genre'
         )
         .eq(
           'active',
@@ -912,12 +923,26 @@ export default function RoomGamePage() {
     }
 
 
+    const genres =
+      Array.isArray(
+        allowedGenres
+      )
+        ? allowedGenres
+        : []
+
+
     setSongs(
       (data || [])
         .filter(
           item =>
             Boolean(
               item.spotify_id
+            ) &&
+            (
+              !genres.length ||
+              genres.includes(
+                item.genre
+              )
             )
         )
     )
@@ -2066,7 +2091,89 @@ export default function RoomGamePage() {
   =====================================
   */
 
-  function registerFailure(text) {
+  function playNextLevelAutomatically(
+    duration
+  ) {
+    const controller =
+      controllerRef.current
+
+
+    if (
+      !controller ||
+      !spotifyReady ||
+      roundDone ||
+      !roundActive
+    ) {
+      return
+    }
+
+
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+
+    const startPlayback = () => {
+      try {
+        stoppingRef.current =
+          false
+
+        hasPlayedCurrentSongRef.current =
+          true
+
+        controller.restart()
+
+        setAudioStarting(
+          true
+        )
+
+        setIsPlaying(
+          true
+        )
+
+
+        stopTimerRef.current =
+          setTimeout(
+            () => {
+              hardStopSpotify()
+            },
+            duration * 1000
+          )
+
+      } catch (error) {
+        console.error(error)
+
+        setAudioStarting(
+          false
+        )
+
+        setIsPlaying(
+          false
+        )
+      }
+    }
+
+
+    if (
+      stoppingRef.current
+    ) {
+      setTimeout(
+        startPlayback,
+        480
+      )
+
+      return
+    }
+
+
+    startPlayback()
+  }
+
+
+  function registerFailure(
+    text,
+    autoListenMore = false
+  ) {
     if (
       roundDone ||
       !roundActive
@@ -2100,7 +2207,9 @@ export default function RoomGamePage() {
     )
 
 
-    stopSpotify()
+    if (!autoListenMore) {
+      stopSpotify()
+    }
 
 
     setQuery('')
@@ -2116,13 +2225,27 @@ export default function RoomGamePage() {
       levelIndex <
       LEVELS.length - 1
     ) {
+      const nextIndex =
+        levelIndex + 1
+
+      const nextLevel =
+        LEVELS[nextIndex]
+
+
       setLevelIndex(
-        current =>
-          current + 1
+        nextIndex
       )
 
 
       setMessage('')
+
+
+      if (autoListenMore) {
+        playNextLevelAutomatically(
+          nextLevel.duration
+        )
+      }
+
 
       return
     }
@@ -2141,7 +2264,8 @@ export default function RoomGamePage() {
     registerFailure(
       isLastLevel
         ? 'Rendirse'
-        : 'Pasar nivel'
+        : 'Escuchar más',
+      !isLastLevel
     )
   }
 
@@ -2973,6 +3097,96 @@ export default function RoomGamePage() {
     <section className="solo-game room-unified-game">
 
 
+      {showHowTo && (
+
+        <div
+          onClick={
+            () =>
+              setShowHowTo(false)
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 500,
+            background: 'rgba(0,0,0,.72)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20
+          }}
+        >
+
+          <div
+            onClick={
+              event =>
+                event.stopPropagation()
+            }
+            style={{
+              width: 'min(440px, 100%)',
+              background: '#151517',
+              border: '1px solid rgba(255,255,255,.1)',
+              borderRadius: 22,
+              padding: 24,
+              boxShadow: '0 24px 70px rgba(0,0,0,.55)'
+            }}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16
+              }}
+            >
+
+              <h2 style={{ margin: 0 }}>
+                Cómo jugar
+              </h2>
+
+              <button
+                type="button"
+                onClick={
+                  () =>
+                    setShowHowTo(false)
+                }
+                aria-label="Cerrar"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  opacity: 0.65,
+                  padding: 4,
+                  display: 'inline-flex',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+
+            <p
+              className="muted"
+              style={{
+                lineHeight: 1.6,
+                marginBottom: 0
+              }}
+            >
+              Escucha el fragmento disponible y busca
+              la canción. Si fallas o pasas de nivel,
+              escucharás más segundos y el valor de la
+              ronda baja. Cada ronda dura 60 segundos.
+              Gana quien sume más puntos.
+            </p>
+
+          </div>
+
+        </div>
+
+      )}
+
+
       {/*
       Spotify siempre montado.
       */}
@@ -3018,9 +3232,40 @@ export default function RoomGamePage() {
                 Sala {room.code}
               </span>
 
-              <h1>
-                Adivina la canción
-              </h1>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+
+                <h1>
+                  Adivina la canción
+                </h1>
+
+                <button
+                  type="button"
+                  onClick={
+                    () =>
+                      setShowHowTo(true)
+                  }
+                  aria-label="Cómo jugar"
+                  title="Cómo jugar"
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'inherit',
+                    opacity: 0.62,
+                    padding: 3,
+                    display: 'inline-flex',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <CircleHelp size={19} />
+                </button>
+
+              </div>
 
             </div>
 
@@ -3311,11 +3556,15 @@ export default function RoomGamePage() {
                         }
                       >
 
-                        <SkipForward size={17} />
+                        {isLastLevel ? (
+                          <SkipForward size={17} />
+                        ) : (
+                          <Volume2 size={17} />
+                        )}
 
                         {isLastLevel
                           ? 'Rendirse'
-                          : 'Pasar nivel'}
+                          : 'Escuchar más'}
 
                       </button>
 

@@ -14,7 +14,9 @@ import {
   Pause,
   Search,
   ArrowRight,
-  SkipForward
+  SkipForward,
+  CircleHelp,
+  X
 } from 'lucide-react'
 
 import {
@@ -323,6 +325,11 @@ export default function OneNoteGamePage() {
 
   const [message, setMessage] =
     useState('')
+
+  const [
+    showHowTo,
+    setShowHowTo
+  ] = useState(false)
 
 
   /*
@@ -796,7 +803,9 @@ export default function OneNoteGamePage() {
       }
 
 
-      await loadSongs()
+      await loadSongs(
+        roomData.genres
+      )
 
 
       setRoom(
@@ -823,7 +832,9 @@ export default function OneNoteGamePage() {
         roomData.id
       ),
 
-      loadSongs(),
+      loadSongs(
+        roomData.genres
+      ),
 
       loadBuzzes(
         roomData.id,
@@ -934,7 +945,9 @@ export default function OneNoteGamePage() {
   =====================================
   */
 
-  async function loadSongs() {
+  async function loadSongs(
+    allowedGenres = null
+  ) {
     const {
       data,
       error
@@ -942,7 +955,7 @@ export default function OneNoteGamePage() {
       await supabase
         .from('songs')
         .select(
-          'id, title, artist, spotify_id, album_image_url'
+          'id, title, artist, spotify_id, album_image_url, genre'
         )
         .eq(
           'active',
@@ -957,12 +970,26 @@ export default function OneNoteGamePage() {
     }
 
 
+    const genres =
+      Array.isArray(
+        allowedGenres
+      )
+        ? allowedGenres
+        : []
+
+
     const cleanSongs =
       (data || [])
         .filter(
           item =>
             Boolean(
               item.spotify_id
+            ) &&
+            (
+              !genres.length ||
+              genres.includes(
+                item.genre
+              )
             )
         )
 
@@ -2900,7 +2927,9 @@ export default function OneNoteGamePage() {
       !availableSongs.length
     ) {
       availableSongs =
-        await loadSongs()
+        await loadSongs(
+          room?.genres
+        )
     }
 
 
@@ -3291,6 +3320,97 @@ export default function OneNoteGamePage() {
     <section className="one-note-game">
 
 
+      {showHowTo && (
+
+        <div
+          onClick={
+            () =>
+              setShowHowTo(false)
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 500,
+            background: 'rgba(0,0,0,.72)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20
+          }}
+        >
+
+          <div
+            onClick={
+              event =>
+                event.stopPropagation()
+            }
+            style={{
+              width: 'min(440px, 100%)',
+              background: '#151517',
+              border: '1px solid rgba(255,255,255,.1)',
+              borderRadius: 22,
+              padding: 24,
+              boxShadow: '0 24px 70px rgba(0,0,0,.55)'
+            }}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16
+              }}
+            >
+
+              <h2 style={{ margin: 0 }}>
+                Cómo jugar
+              </h2>
+
+              <button
+                type="button"
+                onClick={
+                  () =>
+                    setShowHowTo(false)
+                }
+                aria-label="Cerrar"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  opacity: 0.65,
+                  padding: 4,
+                  display: 'inline-flex',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+
+            <p
+              className="muted"
+              style={{
+                lineHeight: 1.6,
+                marginBottom: 0
+              }}
+            >
+              Una sola pantalla reproduce la canción.
+              Cuando creas saberla, toca Adivinar para
+              entrar en la fila. Al llegar tu turno,
+              busca y envía la canción antes de que
+              termine el tiempo. Cada acierto vale
+              1 punto.
+            </p>
+
+          </div>
+
+        </div>
+
+      )}
+
+
       {player.is_host && (
 
         <div className="spotify-hidden-player">
@@ -3312,9 +3432,40 @@ export default function OneNoteGamePage() {
             Sala {room.code}
           </span>
 
-          <h1>
-            En una nota
-          </h1>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+
+            <h1>
+              En una nota
+            </h1>
+
+            <button
+              type="button"
+              onClick={
+                () =>
+                  setShowHowTo(true)
+              }
+              aria-label="Cómo jugar"
+              title="Cómo jugar"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                opacity: 0.62,
+                padding: 3,
+                display: 'inline-flex',
+                cursor: 'pointer'
+              }}
+            >
+              <CircleHelp size={19} />
+            </button>
+
+          </div>
 
         </div>
 

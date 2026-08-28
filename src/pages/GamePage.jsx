@@ -7,7 +7,11 @@ import {
 import {
   Play,
   Pause,
-  SkipForward
+  SkipForward,
+  Volume2,
+  Disc3,
+  CircleHelp,
+  X
 } from 'lucide-react'
 
 import {
@@ -19,35 +23,46 @@ import {
 } from '../lib/spotifyIframe'
 
 
+const GENRE_OPTIONS = [
+  'Urbano / Reggaetón',
+  'Rock / Alternativo',
+  'Pop',
+  'Salsa / Tropical',
+  'Balada / Romántica',
+  'Regional / Ranchera',
+  'Bachata'
+]
+
+
 const LEVELS = [
   {
     id: 'imposible',
     label: 'Imposible',
-    duration: 1,
+    duration: 2,
     points: 500
   },
   {
     id: 'experto',
     label: 'Experto',
-    duration: 2,
+    duration: 4,
     points: 400
   },
   {
     id: 'dificil',
     label: 'Difícil',
-    duration: 5,
+    duration: 8,
     points: 300
   },
   {
     id: 'media',
     label: 'Media',
-    duration: 10,
+    duration: 15,
     points: 200
   },
   {
     id: 'facil',
     label: 'Fácil',
-    duration: 15,
+    duration: 25,
     points: 100
   }
 ]
@@ -184,8 +199,26 @@ function searchLibrary(
 
 
 export default function GamePage() {
+  const [allSongs, setAllSongs] =
+    useState([])
+
   const [songs, setSongs] =
     useState([])
+
+  const [
+    selectedGenres,
+    setSelectedGenres
+  ] = useState([])
+
+  const [
+    genrePanelOpen,
+    setGenrePanelOpen
+  ] = useState(false)
+
+  const [
+    showHowTo,
+    setShowHowTo
+  ] = useState(false)
 
   const [song, setSong] =
     useState(null)
@@ -355,6 +388,10 @@ export default function GamePage() {
           )
 
 
+      setAllSongs(
+        library
+      )
+
       setSongs(
         library
       )
@@ -451,6 +488,55 @@ export default function GamePage() {
         candidates.length
       )
     ]
+  }
+
+
+  function getGenreLibrary(
+    source = allSongs,
+    genres = selectedGenres
+  ) {
+    if (
+      !Array.isArray(source) ||
+      !source.length
+    ) {
+      return []
+    }
+
+
+    if (
+      !genres.length
+    ) {
+      return source
+    }
+
+
+    return source.filter(
+      item =>
+        genres.includes(
+          item.genre
+        )
+    )
+  }
+
+
+  function toggleGenre(genre) {
+    setSelectedGenres(
+      current =>
+        current.includes(genre)
+          ? current.filter(
+              item =>
+                item !== genre
+            )
+          : [
+              ...current,
+              genre
+            ]
+    )
+  }
+
+
+  function selectAllGenres() {
+    setSelectedGenres([])
   }
 
 
@@ -860,9 +946,82 @@ export default function GamePage() {
 
   /*
   =====================================
-  PASAR NIVEL
+  ESCUCHAR MÁS
   =====================================
   */
+
+  function playNextLevelAutomatically(
+    duration
+  ) {
+    const controller =
+      getActiveController()
+
+
+    if (!controller) {
+      return
+    }
+
+
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+
+    const startPlayback = () => {
+      try {
+        stoppingRef.current =
+          false
+
+        markActiveAsPlayed()
+
+        controller.restart()
+
+        setAudioStarting(
+          true
+        )
+
+        setIsPlaying(
+          true
+        )
+
+
+        stopTimerRef.current =
+          setTimeout(
+            () => {
+              hardStopSpotify()
+            },
+            duration * 1000
+          )
+
+      } catch (error) {
+        console.error(error)
+
+        setAudioStarting(
+          false
+        )
+
+        setIsPlaying(
+          false
+        )
+      }
+    }
+
+
+    if (
+      stoppingRef.current
+    ) {
+      setTimeout(
+        startPlayback,
+        480
+      )
+
+      return
+    }
+
+
+    startPlayback()
+  }
+
 
   function passLevel() {
     if (
@@ -870,9 +1029,6 @@ export default function GamePage() {
     ) {
       return
     }
-
-
-    stopSpotify()
 
 
     setAttempts(
@@ -885,7 +1041,7 @@ export default function GamePage() {
           text:
             isLastLevel
               ? 'Rendirse'
-              : 'Pasar nivel',
+              : 'Escuchar más',
 
           correct:
             false
@@ -910,13 +1066,24 @@ export default function GamePage() {
     }
 
 
+    const nextIndex =
+      levelIndex + 1
+
+    const nextLevel =
+      LEVELS[nextIndex]
+
+
     setLevelIndex(
-      current =>
-        current + 1
+      nextIndex
     )
 
 
     setMessage('')
+
+
+    playNextLevelAutomatically(
+      nextLevel.duration
+    )
   }
 
 
@@ -1076,17 +1243,44 @@ export default function GamePage() {
     stopSpotify()
 
 
-    const newCurrent =
-      nextSongData ||
-      pickRandomSong(
-        songs,
-        song?.id
+    const filteredLibrary =
+      getGenreLibrary()
+
+
+    const library =
+      filteredLibrary.length
+        ? filteredLibrary
+        : allSongs
+
+
+    setSongs(
+      library
+    )
+
+
+    const preloadedStillValid =
+      Boolean(
+        nextSongData &&
+        library.some(
+          item =>
+            item.id ===
+            nextSongData.id
+        )
       )
+
+
+    const newCurrent =
+      preloadedStillValid
+        ? nextSongData
+        : pickRandomSong(
+            library,
+            song?.id
+          )
 
 
     const newUpcoming =
       pickRandomSong(
-        songs,
+        library,
         newCurrent?.id
       )
 
@@ -1099,6 +1293,76 @@ export default function GamePage() {
 
     activeSlotRef.current =
       nextSlot
+
+
+    const activeController =
+      nextSlot === 'A'
+        ? controllerARef.current
+        : controllerBRef.current
+
+
+    if (
+      !preloadedStillValid &&
+      activeController &&
+      newCurrent?.spotify_id
+    ) {
+      const uri =
+        `spotify:track:${newCurrent.spotify_id}`
+
+
+      setSpotifyReady(
+        false
+      )
+
+
+      if (
+        nextSlot === 'A'
+      ) {
+        readyARef.current =
+          false
+
+        playedARef.current =
+          false
+      } else {
+        readyBRef.current =
+          false
+
+        playedBRef.current =
+          false
+      }
+
+
+      activeController.loadEntity(
+        uri,
+        false,
+        0
+      )
+
+
+      setTimeout(
+        () => {
+          if (
+            nextSlot ===
+            activeSlotRef.current
+          ) {
+            if (
+              nextSlot === 'A'
+            ) {
+              readyARef.current =
+                true
+            } else {
+              readyBRef.current =
+                true
+            }
+
+            setSpotifyReady(
+              true
+            )
+          }
+        },
+        500
+      )
+    }
 
 
     setSong(
@@ -1200,6 +1464,258 @@ export default function GamePage() {
     <section className="solo-game">
 
 
+      {showHowTo && (
+
+        <div
+          onClick={
+            () =>
+              setShowHowTo(false)
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 600,
+            background: 'rgba(0,0,0,.72)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20
+          }}
+        >
+
+          <div
+            onClick={
+              event =>
+                event.stopPropagation()
+            }
+            style={{
+              width: 'min(440px, 100%)',
+              background: '#151517',
+              border: '1px solid rgba(255,255,255,.1)',
+              borderRadius: 22,
+              padding: 24,
+              boxShadow: '0 24px 70px rgba(0,0,0,.55)'
+            }}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16
+              }}
+            >
+
+              <h2 style={{ margin: 0 }}>
+                Cómo jugar
+              </h2>
+
+              <button
+                type="button"
+                onClick={
+                  () =>
+                    setShowHowTo(false)
+                }
+                aria-label="Cerrar"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  opacity: 0.65,
+                  padding: 4,
+                  display: 'inline-flex',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+
+            <p
+              className="muted"
+              style={{
+                lineHeight: 1.65,
+                marginBottom: 0
+              }}
+            >
+              Escucha un fragmento y trata de adivinar
+              la canción. Si fallas o pasas de nivel,
+              tendrás más segundos, pero ganarás menos
+              puntos. Tienes cinco intentos por canción.
+            </p>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {genrePanelOpen && (
+
+        <div
+          onClick={
+            () =>
+              setGenrePanelOpen(false)
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 590,
+            background: 'rgba(0,0,0,.68)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20
+          }}
+        >
+
+          <div
+            onClick={
+              event =>
+                event.stopPropagation()
+            }
+            style={{
+              width: 'min(480px, 100%)',
+              background: '#151517',
+              border: '1px solid rgba(255,255,255,.1)',
+              borderRadius: 22,
+              padding: 24,
+              boxShadow: '0 24px 70px rgba(0,0,0,.55)'
+            }}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16,
+                marginBottom: 8
+              }}
+            >
+
+              <div>
+                <small
+                  style={{
+                    display: 'block',
+                    opacity: 0.48,
+                    marginBottom: 4
+                  }}
+                >
+                  FILTRO
+                </small>
+
+                <h2 style={{ margin: 0 }}>
+                  Géneros
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  () =>
+                    setGenrePanelOpen(false)
+                }
+                aria-label="Cerrar"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  opacity: 0.65,
+                  padding: 4,
+                  display: 'inline-flex',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+
+            <p
+              className="muted"
+              style={{
+                marginTop: 0,
+                lineHeight: 1.5
+              }}
+            >
+              Elige uno o varios. El cambio se aplica
+              desde la siguiente canción.
+            </p>
+
+
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginTop: 18
+              }}
+            >
+
+              <button
+                type="button"
+                className={
+                  selectedGenres.length === 0
+                    ? 'primary'
+                    : 'secondary'
+                }
+                onClick={
+                  selectAllGenres
+                }
+                style={{
+                  width: 'auto',
+                  minHeight: 38,
+                  padding: '0 14px'
+                }}
+              >
+                Todos
+              </button>
+
+
+              {GENRE_OPTIONS.map(
+                genre => (
+
+                  <button
+                    key={genre}
+                    type="button"
+                    className={
+                      selectedGenres.includes(
+                        genre
+                      )
+                        ? 'primary'
+                        : 'secondary'
+                    }
+                    onClick={
+                      () =>
+                        toggleGenre(
+                          genre
+                        )
+                    }
+                    style={{
+                      width: 'auto',
+                      minHeight: 38,
+                      padding: '0 14px'
+                    }}
+                  >
+                    {genre}
+                  </button>
+
+                )
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+
       {/*
       SIEMPRE montados.
       Este era el bug del audio.
@@ -1240,9 +1756,67 @@ export default function GamePage() {
 
         <div className="solo-top">
 
-          <h1>
-            Adivina la canción
-          </h1>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+
+            <h1>
+              Adivina la canción
+            </h1>
+
+
+            <button
+              type="button"
+              onClick={
+                () =>
+                  setShowHowTo(true)
+              }
+              aria-label="Cómo jugar"
+              title="Cómo jugar"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                opacity: 0.58,
+                padding: 3,
+                display: 'inline-flex',
+                cursor: 'pointer'
+              }}
+            >
+              <CircleHelp size={18} />
+            </button>
+
+
+            <button
+              type="button"
+              onClick={
+                () =>
+                  setGenrePanelOpen(true)
+              }
+              aria-label="Filtrar por género"
+              title="Filtrar por género"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                opacity:
+                  selectedGenres.length
+                    ? 1
+                    : 0.58,
+                padding: 3,
+                display: 'inline-flex',
+                cursor: 'pointer'
+              }}
+            >
+              <Disc3 size={18} />
+            </button>
+
+          </div>
+
 
           <span className="solo-score">
             {score} pts
@@ -1443,13 +2017,19 @@ export default function GamePage() {
                 }
               >
 
-                <SkipForward
-                  size={17}
-                />
+                {isLastLevel ? (
+                  <SkipForward
+                    size={17}
+                  />
+                ) : (
+                  <Volume2
+                    size={17}
+                  />
+                )}
 
                 {isLastLevel
                   ? 'Rendirse'
-                  : 'Pasar nivel'}
+                  : 'Escuchar más'}
 
               </button>
 
