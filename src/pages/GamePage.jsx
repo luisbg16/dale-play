@@ -11,6 +11,9 @@ import {
   Volume2,
   Disc3,
   CircleHelp,
+  Trophy,
+  Heart,
+  Flame,
   X
 } from 'lucide-react'
 
@@ -248,6 +251,64 @@ export default function GamePage() {
   const [earnedPoints, setEarnedPoints] =
     useState(0)
 
+  const [lives, setLives] =
+    useState(3)
+
+  const [
+    impossibleStreak,
+    setImpossibleStreak
+  ] = useState(0)
+
+  const [
+    bestImpossibleStreak,
+    setBestImpossibleStreak
+  ] = useState(0)
+
+  const [
+    runIsRanked,
+    setRunIsRanked
+  ] = useState(true)
+
+  const [
+    showLeaderboard,
+    setShowLeaderboard
+  ] = useState(false)
+
+  const [
+    leaderboard,
+    setLeaderboard
+  ] = useState([])
+
+  const [
+    leaderboardLoading,
+    setLeaderboardLoading
+  ] = useState(false)
+
+  const [
+    showSaveScore,
+    setShowSaveScore
+  ] = useState(false)
+
+  const [
+    playerName,
+    setPlayerName
+  ] = useState(
+    () =>
+      localStorage.getItem(
+        'daleplay-solo-name'
+      ) || ''
+  )
+
+  const [
+    savingScore,
+    setSavingScore
+  ] = useState(false)
+
+  const [
+    saveMessage,
+    setSaveMessage
+  ] = useState('')
+
 
   const [query, setQuery] =
     useState('')
@@ -341,6 +402,7 @@ export default function GamePage() {
 
   useEffect(() => {
     initializeGame()
+    loadLeaderboard()
 
     return () => {
       stopSpotify()
@@ -521,22 +583,232 @@ export default function GamePage() {
 
   function toggleGenre(genre) {
     setSelectedGenres(
-      current =>
-        current.includes(genre)
-          ? current.filter(
-              item =>
-                item !== genre
-            )
-          : [
-              ...current,
-              genre
-            ]
+      current => {
+        const next =
+          current.includes(genre)
+            ? current.filter(
+                item =>
+                  item !== genre
+              )
+            : [
+                ...current,
+                genre
+              ]
+
+
+        if (next.length > 0) {
+          setRunIsRanked(false)
+        }
+
+
+        return next
+      }
     )
   }
 
 
   function selectAllGenres() {
     setSelectedGenres([])
+  }
+
+
+  function getOrCreatePlayerKey() {
+    const storageKey =
+      'daleplay-solo-player-key'
+
+    const existing =
+      localStorage.getItem(
+        storageKey
+      )
+
+
+    if (existing) {
+      return existing
+    }
+
+
+    const generated =
+      crypto.randomUUID()
+
+
+    localStorage.setItem(
+      storageKey,
+      generated
+    )
+
+
+    return generated
+  }
+
+
+  async function loadLeaderboard() {
+    setLeaderboardLoading(
+      true
+    )
+
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from('solo_scores')
+        .select(
+          'player_name, best_score, best_impossible_streak'
+        )
+        .order(
+          'best_score',
+          {
+            ascending: false
+          }
+        )
+        .order(
+          'best_impossible_streak',
+          {
+            ascending: false
+          }
+        )
+        .limit(20)
+
+
+    if (error) {
+      console.error(error)
+
+      setLeaderboard([])
+    } else {
+      setLeaderboard(
+        data || []
+      )
+    }
+
+
+    setLeaderboardLoading(
+      false
+    )
+  }
+
+
+  async function openLeaderboard() {
+    setShowLeaderboard(
+      true
+    )
+
+    await loadLeaderboard()
+  }
+
+
+  async function saveScore() {
+    const cleanName =
+      playerName
+        .trim()
+        .slice(0, 24)
+
+
+    if (!cleanName) {
+      setSaveMessage(
+        'Escribe un nombre.'
+      )
+
+      return
+    }
+
+
+    if (
+      !runIsRanked ||
+      selectedGenres.length > 0
+    ) {
+      setSaveMessage(
+        'Esta partida no participa en el ranking.'
+      )
+
+      return
+    }
+
+
+    setSavingScore(
+      true
+    )
+
+    setSaveMessage('')
+
+
+    try {
+      const playerKey =
+        getOrCreatePlayerKey()
+
+
+      const {
+        error
+      } =
+        await supabase
+          .rpc(
+            'save_solo_score',
+            {
+              p_player_key:
+                playerKey,
+
+              p_player_name:
+                cleanName,
+
+              p_score:
+                score,
+
+              p_best_impossible_streak:
+                bestImpossibleStreak
+            }
+          )
+
+
+      if (error) {
+        throw error
+      }
+
+
+      localStorage.setItem(
+        'daleplay-solo-name',
+        cleanName
+      )
+
+
+      setPlayerName(
+        cleanName
+      )
+
+      setSaveMessage(
+        'Puntaje guardado.'
+      )
+
+
+      await loadLeaderboard()
+
+    } catch (error) {
+      console.error(error)
+
+      setSaveMessage(
+        error.message ||
+        'No se pudo guardar el puntaje.'
+      )
+
+    } finally {
+      setSavingScore(
+        false
+      )
+    }
+  }
+
+
+  function playAgainFromZero() {
+    setScore(0)
+    setLives(3)
+    setImpossibleStreak(0)
+    setBestImpossibleStreak(0)
+    setRunIsRanked(
+      selectedGenres.length === 0
+    )
+    setShowSaveScore(false)
+    setSaveMessage('')
+
+    nextSong()
   }
 
 
@@ -972,9 +1244,28 @@ export default function GamePage() {
         stoppingRef.current =
           false
 
-        markActiveAsPlayed()
 
-        controller.restart()
+        /*
+        IMPORTANTE:
+
+        restart() solo es confiable cuando
+        esta canción ya se reprodujo antes.
+
+        Si el jugador toca "Escuchar más"
+        sin haber pulsado Play todavía,
+        usamos play() en ese primer arranque.
+        */
+
+        if (
+          activeAlreadyPlayed()
+        ) {
+          controller.restart()
+        } else {
+          markActiveAsPlayed()
+
+          controller.play()
+        }
+
 
         setAudioStarting(
           true
@@ -1066,6 +1357,11 @@ export default function GamePage() {
     }
 
 
+    if (levelIndex === 0) {
+      setImpossibleStreak(0)
+    }
+
+
     const nextIndex =
       levelIndex + 1
 
@@ -1138,6 +1434,11 @@ export default function GamePage() {
       setSearchResults([])
 
 
+      if (levelIndex === 0) {
+        setImpossibleStreak(0)
+      }
+
+
       if (
         isLastLevel
       ) {
@@ -1159,6 +1460,26 @@ export default function GamePage() {
 
     const points =
       currentLevel.points
+
+
+    if (levelIndex === 0) {
+      const nextStreak =
+        impossibleStreak + 1
+
+      setImpossibleStreak(
+        nextStreak
+      )
+
+      setBestImpossibleStreak(
+        current =>
+          Math.max(
+            current,
+            nextStreak
+          )
+      )
+    } else {
+      setImpossibleStreak(0)
+    }
 
 
     setAttempts(
@@ -1212,9 +1533,39 @@ export default function GamePage() {
       0
     )
 
-    setStatus(
-      'lost'
+    setImpossibleStreak(
+      0
     )
+
+
+    const nextLives =
+      lives - 1
+
+
+    setLives(
+      Math.max(
+        0,
+        nextLives
+      )
+    )
+
+
+    if (nextLives <= 0) {
+      setStatus(
+        'game_over'
+      )
+
+      setShowSaveScore(
+        false
+      )
+
+      loadLeaderboard()
+    } else {
+      setStatus(
+        'lost'
+      )
+    }
+
 
     setMessage('')
 
@@ -1541,9 +1892,12 @@ export default function GamePage() {
               }}
             >
               Escucha un fragmento y trata de adivinar
-              la canción. Si fallas o pasas de nivel,
-              tendrás más segundos, pero ganarás menos
-              puntos. Tienes cinco intentos por canción.
+              la canción. Si necesitas más pista, toca
+              Escuchar más: tendrás más segundos, pero
+              ganarás menos puntos. Tienes 3 vidas.
+              Si pierdes una canción, pierdes una vida.
+              Acierta varias seguidas en Imposible para
+              aumentar tu racha.
             </p>
 
           </div>
@@ -1647,6 +2001,44 @@ export default function GamePage() {
             </p>
 
 
+            {selectedGenres.length > 0 && (
+
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: '11px 12px',
+                  borderRadius: 12,
+                  background: 'rgba(255,138,66,.08)',
+                  border: '1px solid rgba(255,138,66,.18)'
+                }}
+              >
+
+                <strong
+                  style={{
+                    display: 'block',
+                    fontSize: '.82rem'
+                  }}
+                >
+                  Modo personalizado
+                </strong>
+
+                <small
+                  className="muted"
+                  style={{
+                    display: 'block',
+                    marginTop: 3,
+                    lineHeight: 1.45
+                  }}
+                >
+                  Los puntajes con filtro de género no
+                  participan en la tabla de mejores puntajes.
+                </small>
+
+              </div>
+
+            )}
+
+
             <div
               style={{
                 display: 'flex',
@@ -1708,6 +2100,180 @@ export default function GamePage() {
               )}
 
             </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {showLeaderboard && (
+
+        <div
+          onClick={
+            () =>
+              setShowLeaderboard(false)
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 620,
+            background: 'rgba(0,0,0,.72)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20
+          }}
+        >
+
+          <div
+            onClick={
+              event =>
+                event.stopPropagation()
+            }
+            style={{
+              width: 'min(500px, 100%)',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              background: '#151517',
+              border: '1px solid rgba(255,255,255,.1)',
+              borderRadius: 22,
+              padding: 22,
+              boxShadow: '0 24px 70px rgba(0,0,0,.55)'
+            }}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 14,
+                marginBottom: 16
+              }}
+            >
+
+              <div>
+                <small
+                  style={{
+                    opacity: 0.48
+                  }}
+                >
+                  TOP 20
+                </small>
+
+                <h2
+                  style={{
+                    margin: '3px 0 0'
+                  }}
+                >
+                  Mejores puntajes
+                </h2>
+              </div>
+
+
+              <button
+                type="button"
+                onClick={
+                  () =>
+                    setShowLeaderboard(false)
+                }
+                aria-label="Cerrar"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  opacity: 0.65,
+                  padding: 4,
+                  display: 'inline-flex',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+
+            {leaderboardLoading ? (
+
+              <p className="muted">
+                Cargando...
+              </p>
+
+            ) : leaderboard.length ? (
+
+              <div
+                style={{
+                  display: 'grid',
+                  gap: 7
+                }}
+              >
+
+                {leaderboard.map(
+                  (
+                    item,
+                    index
+                  ) => (
+
+                    <div
+                      key={
+                        `${item.player_name}-${index}`
+                      }
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '34px 1fr auto auto',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 11px',
+                        borderRadius: 12,
+                        background: 'rgba(255,255,255,.035)'
+                      }}
+                    >
+
+                      <span
+                        style={{
+                          opacity: 0.5
+                        }}
+                      >
+                        #{index + 1}
+                      </span>
+
+                      <strong>
+                        {item.player_name}
+                      </strong>
+
+                      <span>
+                        {item.best_score} pts
+                      </span>
+
+                      <span
+                        title="Mejor racha imposible"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 3,
+                          opacity: 0.72
+                        }}
+                      >
+                        <Flame size={14} />
+                        {item.best_impossible_streak}
+                      </span>
+
+                    </div>
+
+                  )
+                )}
+
+              </div>
+
+            ) : (
+
+              <p className="muted">
+                Todavía no hay puntajes guardados.
+              </p>
+
+            )}
 
           </div>
 
@@ -1818,9 +2384,88 @@ export default function GamePage() {
           </div>
 
 
-          <span className="solo-score">
-            {score} pts
-          </span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 10,
+              flexWrap: 'wrap'
+            }}
+          >
+
+            <span
+              title="Vidas"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                opacity: 0.78
+              }}
+            >
+              {Array.from(
+                {
+                  length: lives
+                }
+              ).map(
+                (
+                  _,
+                  index
+                ) => (
+                  <Heart
+                    key={index}
+                    size={15}
+                    fill="currentColor"
+                  />
+                )
+              )}
+            </span>
+
+
+            {impossibleStreak > 0 && (
+
+              <span
+                title="Racha imposible"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  opacity: 0.82
+                }}
+              >
+                <Flame size={15} />
+                {impossibleStreak}
+              </span>
+
+            )}
+
+
+            <span className="solo-score">
+              {score} pts
+            </span>
+
+
+            <button
+              type="button"
+              onClick={
+                openLeaderboard
+              }
+              aria-label="Mejores puntajes"
+              title="Mejores puntajes"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                opacity: 0.58,
+                padding: 3,
+                display: 'inline-flex',
+                cursor: 'pointer'
+              }}
+            >
+              <Trophy size={18} />
+            </button>
+
+          </div>
 
         </div>
 
@@ -2078,6 +2723,178 @@ export default function GamePage() {
 
         </>
 
+      ) : status === 'game_over' ? (
+
+        <div className="solo-result">
+
+          <Trophy size={42} />
+
+          <h2>
+            Fin de la partida
+          </h2>
+
+
+          <strong
+            style={{
+              fontSize: '1.5rem',
+              marginTop: 8
+            }}
+          >
+            {score} pts
+          </strong>
+
+
+          <p
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 5
+            }}
+          >
+            <Flame size={16} />
+            Mejor racha imposible: {bestImpossibleStreak}
+          </p>
+
+
+          {runIsRanked &&
+          selectedGenres.length === 0 ? (
+
+            <>
+
+              {!showSaveScore ? (
+
+                <button
+                  className="primary"
+                  onClick={
+                    () =>
+                      setShowSaveScore(true)
+                  }
+                  disabled={
+                    score <= 0
+                  }
+                >
+                  Guardar puntuación
+                </button>
+
+              ) : (
+
+                <div
+                  style={{
+                    width: '100%',
+                    display: 'grid',
+                    gap: 8,
+                    marginTop: 10
+                  }}
+                >
+
+                  <input
+                    className="solo-search"
+                    value={playerName}
+                    maxLength={24}
+                    placeholder="Tu nombre o apodo"
+                    onChange={
+                      event => {
+                        setPlayerName(
+                          event.target.value
+                        )
+
+                        setSaveMessage('')
+                      }
+                    }
+                  />
+
+
+                  <button
+                    className="primary"
+                    onClick={
+                      saveScore
+                    }
+                    disabled={
+                      savingScore ||
+                      !playerName.trim()
+                    }
+                  >
+                    {savingScore
+                      ? 'Guardando...'
+                      : 'Guardar'}
+                  </button>
+
+
+                  {saveMessage && (
+
+                    <small>
+                      {saveMessage}
+                    </small>
+
+                  )}
+
+                </div>
+
+              )}
+
+            </>
+
+          ) : (
+
+            <div
+              style={{
+                width: '100%',
+                margin: '10px 0',
+                padding: '11px 12px',
+                borderRadius: 12,
+                background: 'rgba(255,138,66,.08)',
+                border: '1px solid rgba(255,138,66,.18)'
+              }}
+            >
+
+              <strong
+                style={{
+                  fontSize: '.82rem',
+                  margin: 0
+                }}
+              >
+                Modo personalizado
+              </strong>
+
+              <small
+                className="muted"
+                style={{
+                  display: 'block',
+                  marginTop: 3,
+                  lineHeight: 1.45
+                }}
+              >
+                Los puntajes con filtro de género no
+                participan en la tabla de mejores puntajes.
+              </small>
+
+            </div>
+
+          )}
+
+
+          <button
+            className="secondary"
+            onClick={
+              openLeaderboard
+            }
+          >
+            Ver mejores puntajes
+          </button>
+
+
+          <button
+            className="primary"
+            onClick={
+              playAgainFromZero
+            }
+          >
+            Jugar de nuevo
+          </button>
+
+        </div>
+
       ) : (
 
         <div className="solo-result">
@@ -2105,11 +2922,21 @@ export default function GamePage() {
           </p>
 
 
-          {status === 'won' && (
+          {status === 'won' ? (
 
             <strong>
               +{earnedPoints} pts
             </strong>
+
+          ) : (
+
+            <small
+              style={{
+                marginBottom: 12
+              }}
+            >
+              Perdiste una vida · {lives} {lives === 1 ? 'vida' : 'vidas'} restantes
+            </small>
 
           )}
 
@@ -2131,6 +2958,164 @@ export default function GamePage() {
         </div>
 
       )}
+
+
+      <div
+        style={{
+          width: 'min(760px, 100%)',
+          margin: '28px auto 8px',
+          padding: '18px 18px 14px',
+          borderRadius: 18,
+          background: 'rgba(255,255,255,.025)',
+          border: '1px solid rgba(255,255,255,.07)'
+        }}
+      >
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 12
+          }}
+        >
+
+          <div>
+            <small
+              style={{
+                opacity: 0.42,
+                display: 'block',
+                marginBottom: 2
+              }}
+            >
+            </small>
+
+            <strong>
+              Mejores puntajes
+            </strong>
+          </div>
+
+
+          <button
+            type="button"
+            onClick={
+              openLeaderboard
+            }
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'inherit',
+              opacity: 0.58,
+              padding: 0,
+              cursor: 'pointer',
+              fontSize: '.82rem'
+            }}
+          >
+            Ver tabla completa
+          </button>
+
+        </div>
+
+
+        {leaderboardLoading ? (
+
+          <small className="muted">
+            Cargando...
+          </small>
+
+        ) : leaderboard.length ? (
+
+          <div
+            style={{
+              display: 'grid',
+              gap: 6
+            }}
+          >
+
+            {leaderboard
+              .slice(0, 5)
+              .map(
+                (
+                  item,
+                  index
+                ) => (
+
+                  <div
+                    key={
+                      `${item.player_name}-top5-${index}`
+                    }
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0,1fr) auto auto',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '9px 2px',
+                      borderBottom:
+                        index < Math.min(
+                          leaderboard.length,
+                          5
+                        ) - 1
+                          ? '1px solid rgba(255,255,255,.055)'
+                          : 'none'
+                    }}
+                  >
+
+                    <strong
+                      style={{
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontSize: '.92rem'
+                      }}
+                    >
+                      {item.player_name}
+                    </strong>
+
+
+                    <span
+                      style={{
+                        whiteSpace: 'nowrap',
+                        fontSize: '.88rem'
+                      }}
+                    >
+                      {item.best_score} pts
+                    </span>
+
+
+                    <span
+                      title="Mejor racha imposible"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        minWidth: 34,
+                        justifyContent: 'flex-end',
+                        opacity: 0.72,
+                        fontSize: '.88rem'
+                      }}
+                    >
+                      <Flame size={14} />
+                      {item.best_impossible_streak}
+                    </span>
+
+                  </div>
+
+                )
+              )}
+
+          </div>
+
+        ) : (
+
+          <small className="muted">
+            Todavía no hay puntajes guardados.
+          </small>
+
+        )}
+
+      </div>
 
     </section>
   )
