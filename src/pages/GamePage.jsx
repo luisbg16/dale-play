@@ -2725,173 +2725,219 @@ export default function GamePage() {
 
       ) : status === 'game_over' ? (
 
-        <div className="solo-result">
+        <div
+          className="solo-result"
+          style={{
+            width: 'min(760px, 100%)',
+            margin: '18px auto 0',
+            padding: '0 14px'
+          }}
+        >
 
-          <Trophy size={42} />
-
-          <h2>
-            Fin de la partida
-          </h2>
-
-
-          <strong
+          <div
             style={{
-              fontSize: '1.5rem',
-              marginTop: 8
+              width: '100%',
+              padding: '22px 18px 20px',
+              borderRadius: 20,
+              background: 'rgba(255,255,255,.028)',
+              border: '1px solid rgba(255,255,255,.075)',
+              display: 'grid',
+              justifyItems: 'center',
+              textAlign: 'center',
+              gap: 8
             }}
           >
-            {score} pts
-          </strong>
+
+            <Trophy
+              size={36}
+              style={{
+                opacity: 0.9,
+                marginBottom: 2
+              }}
+            />
+
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 'clamp(1.5rem, 6vw, 2rem)'
+              }}
+            >
+              Fin de la partida
+            </h2>
 
 
-          <p
+            <strong
+              style={{
+                fontSize: 'clamp(2rem, 9vw, 2.65rem)',
+                lineHeight: 1,
+                marginTop: 4
+              }}
+            >
+              {score} pts
+            </strong>
+
+
+            <p
+              className="muted"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                margin: '8px 0 2px',
+                fontSize: '.92rem'
+              }}
+            >
+              <Flame size={16} />
+              Mejor racha imposible: {bestImpossibleStreak}
+            </p>
+
+          </div>
+
+
+          <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 5
+              width: '100%',
+              display: 'grid',
+              gap: 10,
+              marginTop: 14
             }}
           >
-            <Flame size={16} />
-            Mejor racha imposible: {bestImpossibleStreak}
-          </p>
 
+            {runIsRanked &&
+            selectedGenres.length === 0 ? (
 
-          {runIsRanked &&
-          selectedGenres.length === 0 ? (
+              <>
 
-            <>
-
-              {!showSaveScore ? (
-
-                <button
-                  className="primary"
-                  onClick={
-                    () =>
-                      setShowSaveScore(true)
-                  }
-                  disabled={
-                    score <= 0
-                  }
-                >
-                  Guardar puntuación
-                </button>
-
-              ) : (
-
-                <div
-                  style={{
-                    width: '100%',
-                    display: 'grid',
-                    gap: 8,
-                    marginTop: 10
-                  }}
-                >
-
-                  <input
-                    className="solo-search"
-                    value={playerName}
-                    maxLength={24}
-                    placeholder="Tu nombre o apodo"
-                    onChange={
-                      event => {
-                        setPlayerName(
-                          event.target.value
-                        )
-
-                        setSaveMessage('')
-                      }
-                    }
-                  />
-
+                {!showSaveScore ? (
 
                   <button
                     className="primary"
                     onClick={
-                      saveScore
+                      () =>
+                        setShowSaveScore(true)
                     }
                     disabled={
-                      savingScore ||
-                      !playerName.trim()
+                      score <= 0
                     }
+                    style={{
+                      minHeight: 52
+                    }}
                   >
-                    {savingScore
-                      ? 'Guardando...'
-                      : 'Guardar'}
+                    Guardar puntuación
                   </button>
 
+                ) : (
 
-                  {saveMessage && (
+                  <div
+                    style={{
+                      width: '100%',
+                      display: 'grid',
+                      gap: 8
+                    }}
+                  >
 
-                    <small>
-                      {saveMessage}
-                    </small>
+                    <input
+                      className="solo-search"
+                      value={playerName}
+                      maxLength={24}
+                      placeholder="Tu nombre o apodo"
+                      onChange={
+                        event => {
+                          setPlayerName(
+                            event.target.value
+                          )
 
-                  )}
+                          setSaveMessage('')
+                        }
+                      }
+                    />
 
-                </div>
 
-              )}
+                    <button
+                      className="primary"
+                      onClick={
+                        saveScore
+                      }
+                      disabled={
+                        savingScore ||
+                        !playerName.trim()
+                      }
+                      style={{
+                        minHeight: 52
+                      }}
+                    >
+                      {savingScore
+                        ? 'Guardando...'
+                        : 'Guardar'}
+                    </button>
 
-            </>
 
-          ) : (
+                    {saveMessage && (
 
-            <div
+                      <small>
+                        {saveMessage}
+                      </small>
+
+                    )}
+
+                  </div>
+
+                )}
+
+              </>
+
+            ) : (
+
+              <div
+                style={{
+                  width: '100%',
+                  padding: '11px 12px',
+                  borderRadius: 12,
+                  background: 'rgba(255,138,66,.08)',
+                  border: '1px solid rgba(255,138,66,.18)'
+                }}
+              >
+
+                <strong
+                  style={{
+                    fontSize: '.82rem',
+                    margin: 0
+                  }}
+                >
+                  Modo personalizado
+                </strong>
+
+                <small
+                  className="muted"
+                  style={{
+                    display: 'block',
+                    marginTop: 3,
+                    lineHeight: 1.45
+                  }}
+                >
+                  Los puntajes con filtro de género no
+                  participan en la tabla de mejores puntajes.
+                </small>
+
+              </div>
+
+            )}
+
+
+            <button
+              className="secondary"
+              onClick={
+                playAgainFromZero
+              }
               style={{
-                width: '100%',
-                margin: '10px 0',
-                padding: '11px 12px',
-                borderRadius: 12,
-                background: 'rgba(255,138,66,.08)',
-                border: '1px solid rgba(255,138,66,.18)'
+                minHeight: 50
               }}
             >
+              Jugar de nuevo
+            </button>
 
-              <strong
-                style={{
-                  fontSize: '.82rem',
-                  margin: 0
-                }}
-              >
-                Modo personalizado
-              </strong>
-
-              <small
-                className="muted"
-                style={{
-                  display: 'block',
-                  marginTop: 3,
-                  lineHeight: 1.45
-                }}
-              >
-                Los puntajes con filtro de género no
-                participan en la tabla de mejores puntajes.
-              </small>
-
-            </div>
-
-          )}
-
-
-          <button
-            className="secondary"
-            onClick={
-              openLeaderboard
-            }
-          >
-            Ver mejores puntajes
-          </button>
-
-
-          <button
-            className="primary"
-            onClick={
-              playAgainFromZero
-            }
-          >
-            Jugar de nuevo
-          </button>
+          </div>
 
         </div>
 
@@ -2963,8 +3009,8 @@ export default function GamePage() {
       <div
         style={{
           width: 'min(760px, 100%)',
-          margin: '28px auto 8px',
-          padding: '18px 18px 14px',
+          margin: '18px auto 8px',
+          padding: '16px 16px 12px',
           borderRadius: 18,
           background: 'rgba(255,255,255,.025)',
           border: '1px solid rgba(255,255,255,.07)'
@@ -2989,6 +3035,7 @@ export default function GamePage() {
                 marginBottom: 2
               }}
             >
+              TOP 5
             </small>
 
             <strong>
