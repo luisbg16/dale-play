@@ -37,6 +37,9 @@ const GENRE_OPTIONS = [
 ]
 
 
+const REVEAL_PLAY_SECONDS = 10
+
+
 const LEVELS = [
   {
     id: 'imposible',
@@ -1063,6 +1066,68 @@ export default function GamePage() {
   }
 
 
+  function playRevealSong() {
+    const controller =
+      getActiveController()
+
+
+    if (!controller) {
+      return
+    }
+
+
+    clearTimeout(
+      stopTimerRef.current
+    )
+
+
+    stoppingRef.current =
+      false
+
+
+    try {
+      if (
+        activeAlreadyPlayed()
+      ) {
+        controller.restart()
+      } else {
+        markActiveAsPlayed()
+
+        controller.play()
+      }
+
+
+      setAudioStarting(
+        true
+      )
+
+      setIsPlaying(
+        true
+      )
+
+
+      stopTimerRef.current =
+        setTimeout(
+          () => {
+            hardStopSpotify()
+          },
+          REVEAL_PLAY_SECONDS * 1000
+        )
+
+    } catch (error) {
+      console.error(error)
+
+      setAudioStarting(
+        false
+      )
+
+      setIsPlaying(
+        false
+      )
+    }
+  }
+
+
   function togglePlay() {
     const controller =
       getActiveController()
@@ -1399,9 +1464,6 @@ export default function GamePage() {
     }
 
 
-    stopSpotify()
-
-
     const correct =
       sameSong(
         song,
@@ -1410,6 +1472,9 @@ export default function GamePage() {
 
 
     if (!correct) {
+      stopSpotify()
+
+
       setAttempts(
         current => [
           ...current,
@@ -1460,6 +1525,9 @@ export default function GamePage() {
 
     const points =
       currentLevel.points
+
+
+    playRevealSong()
 
 
     if (levelIndex === 0) {
@@ -1527,7 +1595,7 @@ export default function GamePage() {
 
 
   function finishLost() {
-    stopSpotify()
+    playRevealSong()
 
     setEarnedPoints(
       0
