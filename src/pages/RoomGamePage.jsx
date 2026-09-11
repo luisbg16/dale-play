@@ -241,6 +241,146 @@ function formatTime(seconds) {
 }
 
 
+function PlaybackTimeline({
+  levels,
+  currentIndex,
+  isPlaying
+}) {
+  const maxDuration =
+    levels[levels.length - 1].duration
+
+  const currentDuration =
+    levels[
+      Math.min(
+        Math.max(currentIndex, 0),
+        levels.length - 1
+      )
+    ]?.duration || 0
+
+  const [elapsed, setElapsed] =
+    useState(0)
+
+  useEffect(() => {
+    setElapsed(0)
+
+    if (!isPlaying) {
+      return
+    }
+
+    const startedAt =
+      performance.now()
+
+    const updateProgress = () => {
+      const seconds =
+        (performance.now() - startedAt) /
+        1000
+
+      setElapsed(
+        Math.min(
+          currentDuration,
+          seconds
+        )
+      )
+    }
+
+    updateProgress()
+
+    const interval =
+      setInterval(
+        updateProgress,
+        50
+      )
+
+    return () => {
+      clearInterval(interval)
+    }
+  }, [
+    isPlaying,
+    currentIndex,
+    currentDuration
+  ])
+
+  const progress =
+    Math.min(
+      100,
+      Math.max(
+        0,
+        (elapsed / maxDuration) * 100
+      )
+    )
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 'min(520px, 88vw)',
+        margin: '12px auto 5px',
+        position: 'relative',
+        height: 12
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 5,
+          height: 3,
+          borderRadius: 999,
+          background: 'rgba(255,255,255,.12)',
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          style={{
+            width: `${progress}%`,
+            height: '100%',
+            borderRadius: 999,
+            background: '#ff8a42',
+            transition: 'width .05s linear'
+          }}
+        />
+      </div>
+
+      {levels
+        .slice(0, -1)
+        .map(level => {
+          const left =
+            (level.duration / maxDuration) * 100
+
+          return (
+            <span
+              key={level.duration}
+              style={{
+                position: 'absolute',
+                left: `${left}%`,
+                top: 2,
+                width: 1,
+                height: 9,
+                background: 'rgba(255,255,255,.38)',
+                transform: 'translateX(-.5px)',
+                borderRadius: 1
+              }}
+            />
+          )
+        })}
+
+      <span
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 2,
+          width: 1,
+          height: 9,
+          background: 'rgba(255,255,255,.38)',
+          borderRadius: 1
+        }}
+      />
+    </div>
+  )
+}
+
+
 export default function RoomGamePage() {
   const { code } =
     useParams()
@@ -3425,6 +3565,13 @@ export default function RoomGamePage() {
                     )}
 
                   </button>
+
+
+                  <PlaybackTimeline
+                    levels={LEVELS}
+                    currentIndex={levelIndex}
+            isPlaying={isPlaying}
+                  />
 
 
                   <div className="solo-duration">
